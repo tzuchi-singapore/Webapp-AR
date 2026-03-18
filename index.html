@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AR Camera Demo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+
+- { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+–neon: #00ffe7;
+–neon2: #ff00aa;
+–dark: #060a0f;
+–glass: rgba(0,255,231,0.07);
+}
+
+body {
+background: var(–dark);
+color: var(–neon);
+font-family: ‘Share Tech Mono’, monospace;
+min-height: 100vh;
+display: flex;
+flex-direction: column;
+align-items: center;
+overflow: hidden;
+}
+
+/* ── HEADER ── */
+header {
+width: 100%;
+padding: 12px 20px;
+display: flex;
+align-items: center;
+justify-content: space-between;
+background: rgba(0,0,0,0.6);
+border-bottom: 1px solid rgba(0,255,231,0.2);
+z-index: 10;
+position: relative;
+}
+header h1 {
+font-family: ‘Orbitron’, sans-serif;
+font-size: clamp(13px, 3.5vw, 20px);
+letter-spacing: 3px;
+text-transform: uppercase;
+color: var(–neon);
+text-shadow: 0 0 12px var(–neon);
+}
+.status-dot {
+width: 10px; height: 10px;
+border-radius: 50%;
+background: #333;
+box-shadow: none;
+transition: all 0.4s;
+display: inline-block;
+margin-right: 8px;
+}
+.status-dot.live {
+background: #0f0;
+box-shadow: 0 0 8px #0f0;
+animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+/* ── VIEWPORT ── */
+#viewport {
+position: relative;
+width: 100vw;
+flex: 1;
+display: flex;
+align-items: center;
+justify-content: center;
+background: #000;
+overflow: hidden;
+}
+
+#camera {
+position: absolute;
+inset: 0;
+width: 100%;
+height: 100%;
+object-fit: cover;
+transform: scaleX(-1); /* mirror */
+}
+
+/* ── CORNER BRACKETS (HUD) ── */
+.corner {
+position: absolute;
+width: 28px; height: 28px;
+border-color: var(–neon);
+border-style: solid;
+opacity: 0.8;
+z-index: 5;
+pointer-events: none;
+}
+.corner.tl { top:14px; left:14px; border-width:3px 0 0 3px; }
+.corner.tr { top:14px; right:14px; border-width:3px 3px 0 0; }
+.corner.bl { bottom:14px; left:14px; border-width:0 0 3px 3px; }
+.corner.br { bottom:14px; right:14px; border-width:0 3px 3px 0; }
+
+/* ── SCANLINE ── */
+#scanline {
+position: absolute;
+top: -4px;
+left: 0; right: 0;
+height: 4px;
+background: linear-gradient(to bottom, transparent, rgba(0,255,231,0.35), transparent);
+animation: scan 3s linear infinite;
+pointer-events: none;
+z-index: 6;
+}
+@keyframes scan { 0%{top:-4px} 100%{top:100%} }
+
+/* ── OVERLAY VIDEO ── */
+#overlay-wrap {
+position: absolute;
+z-index: 4;
+cursor: grab;
+user-select: none;
+touch-action: none;
+/* default position: center */
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+transition: box-shadow 0.2s;
+}
+#overlay-wrap.dragging { cursor: grabbing; }
+#overlay-wrap::before {
+content: ‘’;
+position: absolute;
+inset: -3px;
+border: 2px dashed rgba(0,255,231,0.5);
+border-radius: 4px;
+animation: borderSpin 4s linear infinite;
+pointer-events: none;
+}
+@keyframes borderSpin {
+0%{border-color:rgba(0,255,231,0.5)}
+50%{border-color:rgba(255,0,170,0.5)}
+100%{border-color:rgba(0,255,231,0.5)}
+}
+
+#overlay-video {
+display: block;
+border-radius: 4px;
+width: var(–ov-width, 220px);
+height: auto;
+opacity: var(–ov-opacity, 1);
+mix-blend-mode: normal;
+}
+
+/* placeholder when no video loaded */
+#placeholder {
+width: var(–ov-width, 220px);
+aspect-ratio: 16/9;
+background: rgba(0,255,231,0.08);
+border: 2px dashed rgba(0,255,231,0.3);
+border-radius: 4px;
+display: flex;
+align-items: center;
+justify-content: center;
+flex-direction: column;
+gap: 8px;
+color: rgba(0,255,231,0.5);
+font-size: 12px;
+text-align: center;
+padding: 12px;
+}
+#placeholder svg { opacity: 0.5; }
+
+/* ── PANEL ── */
+#panel {
+width: 100%;
+background: rgba(6,10,15,0.95);
+border-top: 1px solid rgba(0,255,231,0.2);
+padding: 14px 16px;
+z-index: 10;
+display: flex;
+flex-direction: column;
+gap: 12px;
+}
+
+.panel-row {
+display: flex;
+gap: 10px;
+align-items: center;
+flex-wrap: wrap;
+}
+
+label {
+font-size: 11px;
+letter-spacing: 1.5px;
+text-transform: uppercase;
+color: rgba(0,255,231,0.6);
+white-space: nowrap;
+}
+
+input[type=range] {
+flex: 1;
+min-width: 80px;
+accent-color: var(–neon);
+height: 4px;
+cursor: pointer;
+}
+
+.val-badge {
+font-size: 11px;
+color: var(–neon);
+min-width: 36px;
+text-align: right;
+}
+
+/* buttons */
+.btn {
+font-family: ‘Orbitron’, sans-serif;
+font-size: 11px;
+letter-spacing: 2px;
+text-transform: uppercase;
+padding: 9px 16px;
+border: 1px solid var(–neon);
+background: transparent;
+color: var(–neon);
+cursor: pointer;
+border-radius: 2px;
+transition: background 0.2s, box-shadow 0.2s;
+flex: 1;
+min-width: 100px;
+}
+.btn:hover, .btn.active {
+background: rgba(0,255,231,0.12);
+box-shadow: 0 0 10px rgba(0,255,231,0.3);
+}
+.btn.danger {
+border-color: var(–neon2);
+color: var(–neon2);
+}
+.btn.danger:hover { background: rgba(255,0,170,0.1); box-shadow: 0 0 10px rgba(255,0,170,0.3); }
+
+#file-input { display: none; }
+
+/* ── HINT BAR ── */
+#hint {
+font-size: 10px;
+letter-spacing: 1px;
+color: rgba(0,255,231,0.35);
+text-align: center;
+padding-bottom: 4px;
+}
+
+/* ── NO CAMERA MESSAGE ── */
+#nocam {
+position: absolute;
+inset: 0;
+display: flex;
+align-items: center;
+justify-content: center;
+flex-direction: column;
+gap: 12px;
+color: rgba(0,255,231,0.5);
+font-size: 13px;
+text-align: center;
+padding: 20px;
+z-index: 3;
+}
+
+/* blend modes select */
+select {
+background: rgba(0,255,231,0.05);
+border: 1px solid rgba(0,255,231,0.3);
+color: var(–neon);
+font-family: ‘Share Tech Mono’, monospace;
+font-size: 11px;
+padding: 6px 8px;
+border-radius: 2px;
+cursor: pointer;
+flex: 1;
+}
+select option { background: #060a0f; }
+</style>
+
+</head>
+<body>
+
+<header>
+  <h1>⬡ AR Demo</h1>
+  <div style="display:flex;align-items:center;font-size:12px;letter-spacing:2px">
+    <span class="status-dot" id="dot"></span>
+    <span id="cam-label">CAMERA OFF</span>
+  </div>
+</header>
+
+<!-- MAIN VIEWPORT -->
+
+<div id="viewport">
+  <video id="camera" autoplay playsinline muted></video>
+
+  <div id="nocam">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+    </svg>
+    Press START CAMERA below
+  </div>
+
+  <!-- HUD corners -->
+
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
+
+  <!-- Scanline -->
+
+  <div id="scanline"></div>
+
+  <!-- Draggable overlay -->
+
+  <div id="overlay-wrap">
+    <div id="placeholder">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <polygon points="5 3 19 12 5 21 5 3"/>
+      </svg>
+      Load a video<br>to overlay
+    </div>
+    <video id="overlay-video" loop autoplay playsinline muted style="display:none"></video>
+  </div>
+</div>
+
+<!-- CONTROLS PANEL -->
+
+<div id="panel">
+  <!-- Row 1: camera + video load -->
+  <div class="panel-row">
+    <button class="btn" id="cam-btn" onclick="toggleCamera()">▶ Start Camera</button>
+    <button class="btn" onclick="document.getElementById('file-input').click()">⊕ Load Video</button>
+    <input type="file" id="file-input" accept="video/*" onchange="loadVideo(event)">
+  </div>
+
+  <!-- Row 2: size -->
+
+  <div class="panel-row">
+    <label>Size</label>
+    <input type="range" id="size-range" min="80" max="600" value="220"
+      oninput="setSize(this.value)">
+    <span class="val-badge" id="size-val">220px</span>
+  </div>
+
+  <!-- Row 3: opacity -->
+
+  <div class="panel-row">
+    <label>Opacity</label>
+    <input type="range" id="opacity-range" min="10" max="100" value="100"
+      oninput="setOpacity(this.value)">
+    <span class="val-badge" id="opacity-val">100%</span>
+  </div>
+
+  <!-- Row 4: blend mode -->
+
+  <div class="panel-row">
+    <label>Blend</label>
+    <select id="blend-select" onchange="setBlend(this.value)">
+      <option value="normal">Normal</option>
+      <option value="screen">Screen</option>
+      <option value="multiply">Multiply</option>
+      <option value="overlay">Overlay</option>
+      <option value="lighten">Lighten</option>
+      <option value="hard-light">Hard Light</option>
+      <option value="color-dodge">Color Dodge</option>
+    </select>
+  </div>
+
+  <div id="hint">DRAG the video overlay to reposition it anywhere on screen</div>
+</div>
+
+<script>
+// ── STATE ──
+let stream = null;
+let cameraOn = false;
+
+const camera    = document.getElementById('camera');
+const overlayWrap = document.getElementById('overlay-wrap');
+const overlayVid  = document.getElementById('overlay-video');
+const placeholder = document.getElementById('placeholder');
+const dot         = document.getElementById('dot');
+const camLabel    = document.getElementById('cam-label');
+const nocam       = document.getElementById('nocam');
+
+// ── CAMERA ──
+async function toggleCamera() {
+  if (!cameraOn) {
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      camera.srcObject = stream;
+      cameraOn = true;
+      dot.classList.add('live');
+      camLabel.textContent = 'LIVE';
+      nocam.style.display = 'none';
+      document.getElementById('cam-btn').textContent = '■ Stop Camera';
+    } catch(e) {
+      nocam.innerHTML = `<span style="color:var(--neon2)">Camera access denied.<br>Please allow camera in browser settings.</span>`;
+    }
+  } else {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    camera.srcObject = null;
+    cameraOn = false;
+    dot.classList.remove('live');
+    camLabel.textContent = 'CAMERA OFF';
+    nocam.style.display = 'flex';
+    nocam.innerHTML = 'Press START CAMERA below';
+    document.getElementById('cam-btn').textContent = '▶ Start Camera';
+  }
+}
+
+// ── LOAD VIDEO ──
+function loadVideo(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  overlayVid.src = url;
+  overlayVid.style.display = 'block';
+  placeholder.style.display = 'none';
+  overlayVid.play();
+}
+
+// ── SIZE ──
+function setSize(v) {
+  overlayWrap.style.setProperty('--ov-width', v + 'px');
+  document.getElementById('size-val').textContent = v + 'px';
+}
+
+// ── OPACITY ──
+function setOpacity(v) {
+  overlayVid.style.opacity = (v / 100);
+  document.getElementById('opacity-val').textContent = v + '%';
+}
+
+// ── BLEND ──
+function setBlend(v) {
+  overlayVid.style.mixBlendMode = v;
+}
+
+// ── DRAG (mouse + touch) ──
+let dragging = false;
+let startX, startY, initLeft, initTop;
+
+// Convert current transform to px offsets relative to viewport
+function getAbsolutePos() {
+  const rect = overlayWrap.getBoundingClientRect();
+  return { x: rect.left, y: rect.top };
+}
+
+function startDrag(cx, cy) {
+  dragging = true;
+  overlayWrap.classList.add('dragging');
+
+  // Switch from transform-based centering to absolute positioning
+  const vp = document.getElementById('viewport').getBoundingClientRect();
+  const rect = overlayWrap.getBoundingClientRect();
+
+  // Set explicit left/top, remove centering transform
+  overlayWrap.style.transform = 'none';
+  overlayWrap.style.left = (rect.left - vp.left) + 'px';
+  overlayWrap.style.top  = (rect.top  - vp.top)  + 'px';
+
+  startX = cx;
+  startY = cy;
+  initLeft = rect.left - vp.left;
+  initTop  = rect.top  - vp.top;
+}
+
+function moveDrag(cx, cy) {
+  if (!dragging) return;
+  const dx = cx - startX;
+  const dy = cy - startY;
+  overlayWrap.style.left = (initLeft + dx) + 'px';
+  overlayWrap.style.top  = (initTop  + dy) + 'px';
+}
+
+function endDrag() {
+  dragging = false;
+  overlayWrap.classList.remove('dragging');
+}
+
+// Mouse
+overlayWrap.addEventListener('mousedown', e => { e.preventDefault(); startDrag(e.clientX, e.clientY); });
+document.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
+document.addEventListener('mouseup', endDrag);
+
+// Touch
+overlayWrap.addEventListener('touchstart', e => {
+  e.preventDefault();
+  startDrag(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+document.addEventListener('touchmove', e => {
+  e.preventDefault();
+  moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+document.addEventListener('touchend', endDrag);
+</script>
+
+</body>
+</html>
