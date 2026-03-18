@@ -5,7 +5,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>AR Magic Library v3</title>
+<meta http-equiv="Content-Security-Policy" content="default-src * 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src *; img-src * data: blob:; media-src * blob:; script-src * 'unsafe-inline' 'unsafe-eval'; style-src * 'unsafe-inline';">
+<title>AR Magic Library v4</title>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -491,17 +492,25 @@ function populateCatFilter() {
 async function testConnection() {
   const el = document.getElementById('debug-info');
   if (!el) return;
+  el.innerHTML = `⏳ Testing connection...`;
   try {
     const r = await fetch(`${SUPA_URL}/rest/v1/ar_pairs?limit=1`, {
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+      method: 'GET',
+      headers:{
+        'apikey': SUPA_KEY,
+        'Authorization': 'Bearer ' + SUPA_KEY,
+        'Content-Type': 'application/json'
+      }
     });
     if (r.ok) {
-      el.innerHTML = `✅ Database: Connected<br>🌐 Project: phtxvaxdfgpvghvhoyr<br>📦 App version: v3`;
+      const data = await r.json();
+      el.innerHTML = `✅ Database: Connected<br>✅ Supabase project: OK<br>📦 Version: v4<br>📋 Pairs in DB: ${Array.isArray(data) ? data.length : '?'}`;
     } else {
-      el.innerHTML = `❌ Database error: HTTP ${r.status}<br>Check Supabase RLS policies`;
+      const txt = await r.text().catch(()=>'');
+      el.innerHTML = `❌ Database error: HTTP ${r.status}<br>${txt.slice(0,100)}<br>Check Supabase RLS policies`;
     }
   } catch(e) {
-    el.innerHTML = `❌ Cannot reach Supabase<br>Error: ${e.message}<br>Check internet connection`;
+    el.innerHTML = `❌ Cannot reach Supabase<br>Error: ${e.message}<br><br>👉 Go to Supabase → Settings → API<br>Add to Allowed Origins:<br>https://danielphua85.github.io`;
   }
 }
 
