@@ -389,19 +389,42 @@ const nocam       = document.getElementById('nocam');
 // ── CAMERA ──
 async function toggleCamera() {
   if (!cameraOn) {
+    // Check if getUserMedia is supported
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      nocam.innerHTML = `<span style="color:var(--neon2)">⚠️ Camera not supported.<br><br>Open this file in <strong>Safari</strong> on iOS,<br>or <strong>Chrome/Edge</strong> on desktop.<br><br>Must be hosted on <strong>HTTPS</strong> (GitHub Pages).</span>`;
+      return;
+    }
+
     try {
-      stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
-        audio: false
-      });
+      // Try back camera first (better for AR on mobile), fallback to front
+      let constraints = { video: { facingMode: { ideal: 'environment' } }, audio: false };
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch(e1) {
+        // Fallback: any camera, no constraints
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
       camera.srcObject = stream;
+      // iOS Safari needs explicit play() call
+      camera.setAttribute('autoplay', '');
+      camera.setAttribute('playsinline', '');
+      camera.setAttribute('muted', '');
+      await camera.play().catch(() => {});
       cameraOn = true;
       dot.classList.add('live');
       camLabel.textContent = 'LIVE';
       nocam.style.display = 'none';
       document.getElementById('cam-btn').textContent = '■ Stop Camera';
     } catch(e) {
-      nocam.innerHTML = `<span style="color:var(--neon2)">Camera access denied.<br>Please allow camera in browser settings.</span>`;
+      let msg = '⚠️ Camera access denied.';
+      if (e.name === 'NotAllowedError') {
+        msg = `⚠️ Camera blocked.<br><br>Go to <strong>Settings → Safari → Camera</strong><br>and set to <strong>Allow</strong>, then reload.`;
+      } else if (e.name === 'NotFoundError') {
+        msg = `⚠️ No camera found on this device.`;
+      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+        msg = `⚠️ Camera requires <strong>HTTPS</strong>.<br><br>Upload this file to <strong>GitHub Pages</strong><br>and open that URL in Safari.`;
+      }
+      nocam.innerHTML = `<span style="color:var(--neon2);font-size:13px;line-height:1.8">${msg}</span>`;
     }
   } else {
     if (stream) stream.getTracks().forEach(t => t.stop());
