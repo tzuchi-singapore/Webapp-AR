@@ -4,525 +4,440 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>AR Camera Demo</title>
+<title>Step 1 – Compile Target Image</title>
+<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@400;500&display=swap');
 
-- { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-–neon: #00ffe7;
-–neon2: #ff00aa;
-–dark: #060a0f;
-–glass: rgba(0,255,231,0.07);
-}
+- { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+  –gold: #c8a84b;
+  –dark: #0d0d0d;
+  –card: #161616;
+  –border: rgba(200,168,75,0.2);
+  –text: #e8e0cc;
+  –muted: rgba(232,224,204,0.45);
+  }
 
 body {
 background: var(–dark);
-color: var(–neon);
-font-family: ‘Share Tech Mono’, monospace;
+color: var(–text);
+font-family: ‘DM Mono’, monospace;
 min-height: 100vh;
 display: flex;
 flex-direction: column;
 align-items: center;
-overflow: hidden;
+padding: 0 0 40px;
 }
 
-/* ── HEADER ── */
-header {
+/* top bar */
+.topbar {
 width: 100%;
-padding: 12px 20px;
+background: rgba(13,13,13,0.95);
+border-bottom: 1px solid var(–border);
+padding: 16px 24px;
 display: flex;
 align-items: center;
-justify-content: space-between;
-background: rgba(0,0,0,0.6);
-border-bottom: 1px solid rgba(0,255,231,0.2);
-z-index: 10;
-position: relative;
-}
-header h1 {
-font-family: ‘Orbitron’, sans-serif;
-font-size: clamp(13px, 3.5vw, 20px);
-letter-spacing: 3px;
-text-transform: uppercase;
-color: var(–neon);
-text-shadow: 0 0 12px var(–neon);
-}
-.status-dot {
-width: 10px; height: 10px;
-border-radius: 50%;
-background: #333;
-box-shadow: none;
-transition: all 0.4s;
-display: inline-block;
-margin-right: 8px;
-}
-.status-dot.live {
-background: #0f0;
-box-shadow: 0 0 8px #0f0;
-animation: pulse 1.5s infinite;
-}
-@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-/* ── VIEWPORT ── */
-#viewport {
-position: relative;
-width: 100vw;
-flex: 1;
-display: flex;
-align-items: center;
-justify-content: center;
-background: #000;
-overflow: hidden;
-}
-
-#camera {
-position: absolute;
-inset: 0;
-width: 100%;
-height: 100%;
-object-fit: cover;
-transform: scaleX(-1); /* mirror */
-}
-
-/* ── CORNER BRACKETS (HUD) ── */
-.corner {
-position: absolute;
-width: 28px; height: 28px;
-border-color: var(–neon);
-border-style: solid;
-opacity: 0.8;
-z-index: 5;
-pointer-events: none;
-}
-.corner.tl { top:14px; left:14px; border-width:3px 0 0 3px; }
-.corner.tr { top:14px; right:14px; border-width:3px 3px 0 0; }
-.corner.bl { bottom:14px; left:14px; border-width:0 0 3px 3px; }
-.corner.br { bottom:14px; right:14px; border-width:0 3px 3px 0; }
-
-/* ── SCANLINE ── */
-#scanline {
-position: absolute;
-top: -4px;
-left: 0; right: 0;
-height: 4px;
-background: linear-gradient(to bottom, transparent, rgba(0,255,231,0.35), transparent);
-animation: scan 3s linear infinite;
-pointer-events: none;
-z-index: 6;
-}
-@keyframes scan { 0%{top:-4px} 100%{top:100%} }
-
-/* ── OVERLAY VIDEO ── */
-#overlay-wrap {
-position: absolute;
-z-index: 4;
-cursor: grab;
-user-select: none;
-touch-action: none;
-/* default position: center */
-top: 50%;
-left: 50%;
-transform: translate(-50%, -50%);
-transition: box-shadow 0.2s;
-}
-#overlay-wrap.dragging { cursor: grabbing; }
-#overlay-wrap::before {
-content: ‘’;
-position: absolute;
-inset: -3px;
-border: 2px dashed rgba(0,255,231,0.5);
-border-radius: 4px;
-animation: borderSpin 4s linear infinite;
-pointer-events: none;
-}
-@keyframes borderSpin {
-0%{border-color:rgba(0,255,231,0.5)}
-50%{border-color:rgba(255,0,170,0.5)}
-100%{border-color:rgba(0,255,231,0.5)}
-}
-
-#overlay-video {
-display: block;
-border-radius: 4px;
-width: var(–ov-width, 220px);
-height: auto;
-opacity: var(–ov-opacity, 1);
-mix-blend-mode: normal;
-}
-
-/* placeholder when no video loaded */
-#placeholder {
-width: var(–ov-width, 220px);
-aspect-ratio: 16/9;
-background: rgba(0,255,231,0.08);
-border: 2px dashed rgba(0,255,231,0.3);
-border-radius: 4px;
-display: flex;
-align-items: center;
-justify-content: center;
-flex-direction: column;
-gap: 8px;
-color: rgba(0,255,231,0.5);
-font-size: 12px;
-text-align: center;
-padding: 12px;
-}
-#placeholder svg { opacity: 0.5; }
-
-/* ── PANEL ── */
-#panel {
-width: 100%;
-background: rgba(6,10,15,0.95);
-border-top: 1px solid rgba(0,255,231,0.2);
-padding: 14px 16px;
-z-index: 10;
-display: flex;
-flex-direction: column;
 gap: 12px;
 }
-
-.panel-row {
-display: flex;
-gap: 10px;
-align-items: center;
-flex-wrap: wrap;
-}
-
-label {
-font-size: 11px;
-letter-spacing: 1.5px;
-text-transform: uppercase;
-color: rgba(0,255,231,0.6);
-white-space: nowrap;
-}
-
-input[type=range] {
-flex: 1;
-min-width: 80px;
-accent-color: var(–neon);
-height: 4px;
-cursor: pointer;
-}
-
-.val-badge {
-font-size: 11px;
-color: var(–neon);
-min-width: 36px;
-text-align: right;
-}
-
-/* buttons */
-.btn {
-font-family: ‘Orbitron’, sans-serif;
+.step-badge {
+background: var(–gold);
+color: #000;
+font-family: ‘Syne’, sans-serif;
+font-weight: 800;
 font-size: 11px;
 letter-spacing: 2px;
-text-transform: uppercase;
-padding: 9px 16px;
-border: 1px solid var(–neon);
-background: transparent;
-color: var(–neon);
-cursor: pointer;
+padding: 4px 10px;
 border-radius: 2px;
-transition: background 0.2s, box-shadow 0.2s;
-flex: 1;
-min-width: 100px;
 }
-.btn:hover, .btn.active {
-background: rgba(0,255,231,0.12);
-box-shadow: 0 0 10px rgba(0,255,231,0.3);
-}
-.btn.danger {
-border-color: var(–neon2);
-color: var(–neon2);
-}
-.btn.danger:hover { background: rgba(255,0,170,0.1); box-shadow: 0 0 10px rgba(255,0,170,0.3); }
-
-#file-input { display: none; }
-
-/* ── HINT BAR ── */
-#hint {
-font-size: 10px;
+.topbar h1 {
+font-family: ‘Syne’, sans-serif;
+font-size: 16px;
+font-weight: 700;
 letter-spacing: 1px;
-color: rgba(0,255,231,0.35);
-text-align: center;
-padding-bottom: 4px;
+color: var(–text);
 }
 
-/* ── NO CAMERA MESSAGE ── */
-#nocam {
-position: absolute;
-inset: 0;
+/* main */
+.container {
+width: 100%;
+max-width: 520px;
+padding: 32px 20px 0;
+display: flex;
+flex-direction: column;
+gap: 20px;
+}
+
+.card {
+background: var(–card);
+border: 1px solid var(–border);
+border-radius: 4px;
+padding: 24px;
+}
+
+.card-title {
+font-family: ‘Syne’, sans-serif;
+font-size: 13px;
+font-weight: 700;
+letter-spacing: 2px;
+text-transform: uppercase;
+color: var(–gold);
+margin-bottom: 14px;
+}
+
+.card p {
+font-size: 12px;
+line-height: 1.7;
+color: var(–muted);
+margin-bottom: 16px;
+}
+
+/* drop zone */
+#drop-zone {
+border: 2px dashed var(–border);
+border-radius: 4px;
+padding: 36px 20px;
+text-align: center;
+cursor: pointer;
+transition: border-color 0.2s, background 0.2s;
+position: relative;
+}
+#drop-zone:hover, #drop-zone.over {
+border-color: var(–gold);
+background: rgba(200,168,75,0.04);
+}
+#drop-zone input { display: none; }
+#drop-zone svg { opacity: 0.4; margin-bottom: 10px; }
+#drop-zone .dz-label {
+font-size: 12px;
+color: var(–muted);
+line-height: 1.6;
+}
+#drop-zone .dz-label strong { color: var(–gold); }
+
+/* preview */
+#preview-wrap {
+display: none;
+margin-top: 16px;
+text-align: center;
+}
+#preview-img {
+max-width: 100%;
+max-height: 200px;
+border-radius: 4px;
+border: 1px solid var(–border);
+}
+#preview-name {
+font-size: 11px;
+color: var(–muted);
+margin-top: 8px;
+}
+
+/* compile btn */
+.btn-compile {
+display: none;
+width: 100%;
+padding: 14px;
+background: var(–gold);
+color: #000;
+font-family: ‘Syne’, sans-serif;
+font-weight: 800;
+font-size: 13px;
+letter-spacing: 2px;
+text-transform: uppercase;
+border: none;
+border-radius: 3px;
+cursor: pointer;
+margin-top: 16px;
+transition: opacity 0.2s;
+}
+.btn-compile:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* progress */
+#progress-wrap {
+display: none;
+margin-top: 16px;
+}
+.progress-bar-bg {
+background: rgba(200,168,75,0.12);
+border-radius: 2px;
+height: 4px;
+overflow: hidden;
+}
+.progress-bar-fill {
+height: 100%;
+background: var(–gold);
+width: 0%;
+transition: width 0.3s;
+border-radius: 2px;
+}
+#progress-label {
+font-size: 11px;
+color: var(–muted);
+margin-top: 8px;
+text-align: center;
+}
+
+/* feature points canvas */
+#feature-wrap {
+display: none;
+margin-top: 16px;
+text-align: center;
+}
+#feature-canvas {
+max-width: 100%;
+border-radius: 4px;
+border: 1px solid var(–border);
+}
+#feature-label {
+font-size: 11px;
+color: var(–muted);
+margin-top: 6px;
+}
+
+/* download btn */
+#download-wrap {
+display: none;
+margin-top: 16px;
+}
+.btn-download {
+display: block;
+width: 100%;
+padding: 14px;
+background: transparent;
+color: var(–gold);
+font-family: ‘Syne’, sans-serif;
+font-weight: 700;
+font-size: 13px;
+letter-spacing: 2px;
+text-transform: uppercase;
+border: 1px solid var(–gold);
+border-radius: 3px;
+cursor: pointer;
+text-align: center;
+text-decoration: none;
+transition: background 0.2s;
+}
+.btn-download:hover { background: rgba(200,168,75,0.1); }
+
+/* step arrow */
+.next-step {
+background: rgba(200,168,75,0.07);
+border: 1px solid var(–border);
+border-radius: 4px;
+padding: 18px 20px;
+font-size: 12px;
+color: var(–muted);
+line-height: 1.7;
+}
+.next-step strong { color: var(–gold); display: block; margin-bottom: 4px; font-family: ‘Syne’, sans-serif; letter-spacing: 1px; }
+
+.quality-meter {
 display: flex;
 align-items: center;
-justify-content: center;
-flex-direction: column;
-gap: 12px;
-color: rgba(0,255,231,0.5);
-font-size: 13px;
-text-align: center;
-padding: 20px;
-z-index: 3;
-}
-
-/* blend modes select */
-select {
-background: rgba(0,255,231,0.05);
-border: 1px solid rgba(0,255,231,0.3);
-color: var(–neon);
-font-family: ‘Share Tech Mono’, monospace;
+gap: 10px;
+margin-top: 10px;
 font-size: 11px;
-padding: 6px 8px;
-border-radius: 2px;
-cursor: pointer;
-flex: 1;
+color: var(–muted);
 }
-select option { background: #060a0f; }
+.quality-dots {
+display: flex; gap: 4px;
+}
+.dot { width:8px; height:8px; border-radius: 50%; background: rgba(200,168,75,0.15); }
+.dot.on { background: var(–gold); }
 </style>
 
 </head>
 <body>
 
-<header>
-  <h1>⬡ AR Demo</h1>
-  <div style="display:flex;align-items:center;font-size:12px;letter-spacing:2px">
-    <span class="status-dot" id="dot"></span>
-    <span id="cam-label">CAMERA OFF</span>
-  </div>
-</header>
+<div class="topbar">
+  <span class="step-badge">STEP 1 OF 2</span>
+  <h1>Compile Your Target Image</h1>
+</div>
 
-<!-- MAIN VIEWPORT -->
+<div class="container">
 
-<div id="viewport">
-  <video id="camera" autoplay playsinline muted></video>
-
-  <div id="nocam">
-    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/>
-    </svg>
-    Press START CAMERA below
+  <div class="card">
+    <div class="card-title">What is this?</div>
+    <p>This tool converts your photo or screenshot into a <strong style="color:var(--gold)">.mind file</strong> — a special file that the AR scanner uses to recognise your image in the real world.</p>
+    <p>Use a photo that has lots of detail, patterns, or text. Avoid plain or solid-color images.</p>
   </div>
 
-  <!-- HUD corners -->
+  <div class="card">
+    <div class="card-title">Upload Target Image</div>
 
-  <div class="corner tl"></div>
-  <div class="corner tr"></div>
-  <div class="corner bl"></div>
-  <div class="corner br"></div>
+```
+<div id="drop-zone" onclick="document.getElementById('img-input').click()">
+  <input type="file" id="img-input" accept="image/*" onchange="onImageSelected(event)">
+  <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#c8a84b" stroke-width="1.5" display="block" style="margin:0 auto 10px">
+    <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>
+    <polyline points="21 15 16 10 5 21"/>
+  </svg>
+  <div class="dz-label">Tap to choose your photo<br><strong>JPG, PNG, WebP supported</strong></div>
+</div>
 
-  <!-- Scanline -->
+<div id="preview-wrap">
+  <img id="preview-img" src="" alt="preview">
+  <div id="preview-name"></div>
+</div>
 
-  <div id="scanline"></div>
+<button class="btn-compile" id="compile-btn" onclick="compile()">⬡ Compile to .mind File</button>
 
-  <!-- Draggable overlay -->
+<div id="progress-wrap">
+  <div class="progress-bar-bg">
+    <div class="progress-bar-fill" id="progress-fill"></div>
+  </div>
+  <div id="progress-label">Initialising...</div>
+</div>
 
-  <div id="overlay-wrap">
-    <div id="placeholder">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <polygon points="5 3 19 12 5 21 5 3"/>
-      </svg>
-      Load a video<br>to overlay
+<div id="feature-wrap">
+  <canvas id="feature-canvas"></canvas>
+  <div id="feature-label"></div>
+  <div class="quality-meter">
+    <span>Trackability:</span>
+    <div class="quality-dots" id="quality-dots">
+      <div class="dot" id="d1"></div>
+      <div class="dot" id="d2"></div>
+      <div class="dot" id="d3"></div>
+      <div class="dot" id="d4"></div>
+      <div class="dot" id="d5"></div>
     </div>
-    <video id="overlay-video" loop autoplay playsinline muted style="display:none"></video>
+    <span id="quality-text"></span>
   </div>
 </div>
 
-<!-- CONTROLS PANEL -->
+<div id="download-wrap">
+  <a id="download-link" class="btn-download" href="#" download="targets.mind">↓ Download targets.mind</a>
+</div>
+```
 
-<div id="panel">
-  <!-- Row 1: camera + video load -->
-  <div class="panel-row">
-    <button class="btn" id="cam-btn" onclick="toggleCamera()">▶ Start Camera</button>
-    <button class="btn" onclick="document.getElementById('file-input').click()">⊕ Load Video</button>
-    <input type="file" id="file-input" accept="video/*" onchange="loadVideo(event)">
   </div>
 
-  <!-- Row 2: size -->
-
-  <div class="panel-row">
-    <label>Size</label>
-    <input type="range" id="size-range" min="80" max="600" value="220"
-      oninput="setSize(this.value)">
-    <span class="val-badge" id="size-val">220px</span>
+  <div class="next-step">
+    <strong>→ AFTER DOWNLOADING</strong>
+    Upload <code>targets.mind</code> to your GitHub repo, then open <code>step2-ar-viewer.html</code> and update the path inside the code to point to your .mind file.
   </div>
 
-  <!-- Row 3: opacity -->
-
-  <div class="panel-row">
-    <label>Opacity</label>
-    <input type="range" id="opacity-range" min="10" max="100" value="100"
-      oninput="setOpacity(this.value)">
-    <span class="val-badge" id="opacity-val">100%</span>
-  </div>
-
-  <!-- Row 4: blend mode -->
-
-  <div class="panel-row">
-    <label>Blend</label>
-    <select id="blend-select" onchange="setBlend(this.value)">
-      <option value="normal">Normal</option>
-      <option value="screen">Screen</option>
-      <option value="multiply">Multiply</option>
-      <option value="overlay">Overlay</option>
-      <option value="lighten">Lighten</option>
-      <option value="hard-light">Hard Light</option>
-      <option value="color-dodge">Color Dodge</option>
-    </select>
-  </div>
-
-  <div id="hint">DRAG the video overlay to reposition it anywhere on screen</div>
 </div>
 
 <script>
-// ── STATE ──
-let stream = null;
-let cameraOn = false;
+let selectedFile = null;
 
-const camera    = document.getElementById('camera');
-const overlayWrap = document.getElementById('overlay-wrap');
-const overlayVid  = document.getElementById('overlay-video');
-const placeholder = document.getElementById('placeholder');
-const dot         = document.getElementById('dot');
-const camLabel    = document.getElementById('cam-label');
-const nocam       = document.getElementById('nocam');
+function onImageSelected(e) {
+  selectedFile = e.target.files[0];
+  if (!selectedFile) return;
+  const url = URL.createObjectURL(selectedFile);
+  document.getElementById('preview-img').src = url;
+  document.getElementById('preview-name').textContent = selectedFile.name;
+  document.getElementById('preview-wrap').style.display = 'block';
+  document.getElementById('compile-btn').style.display = 'block';
+  // reset
+  document.getElementById('progress-wrap').style.display = 'none';
+  document.getElementById('feature-wrap').style.display = 'none';
+  document.getElementById('download-wrap').style.display = 'none';
+}
 
-// ── CAMERA ──
-async function toggleCamera() {
-  if (!cameraOn) {
-    // Check if getUserMedia is supported
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      nocam.innerHTML = `<span style="color:var(--neon2)">⚠️ Camera not supported.<br><br>Open this file in <strong>Safari</strong> on iOS,<br>or <strong>Chrome/Edge</strong> on desktop.<br><br>Must be hosted on <strong>HTTPS</strong> (GitHub Pages).</span>`;
-      return;
-    }
+async function compile() {
+  if (!selectedFile) return;
 
-    try {
-      // Try back camera first (better for AR on mobile), fallback to front
-      let constraints = { video: { facingMode: { ideal: 'environment' } }, audio: false };
-      try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
-      } catch(e1) {
-        // Fallback: any camera, no constraints
-        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-      }
-      camera.srcObject = stream;
-      // iOS Safari needs explicit play() call
-      camera.setAttribute('autoplay', '');
-      camera.setAttribute('playsinline', '');
-      camera.setAttribute('muted', '');
-      await camera.play().catch(() => {});
-      cameraOn = true;
-      dot.classList.add('live');
-      camLabel.textContent = 'LIVE';
-      nocam.style.display = 'none';
-      document.getElementById('cam-btn').textContent = '■ Stop Camera';
-    } catch(e) {
-      let msg = '⚠️ Camera access denied.';
-      if (e.name === 'NotAllowedError') {
-        msg = `⚠️ Camera blocked.<br><br>Go to <strong>Settings → Safari → Camera</strong><br>and set to <strong>Allow</strong>, then reload.`;
-      } else if (e.name === 'NotFoundError') {
-        msg = `⚠️ No camera found on this device.`;
-      } else if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
-        msg = `⚠️ Camera requires <strong>HTTPS</strong>.<br><br>Upload this file to <strong>GitHub Pages</strong><br>and open that URL in Safari.`;
-      }
-      nocam.innerHTML = `<span style="color:var(--neon2);font-size:13px;line-height:1.8">${msg}</span>`;
-    }
-  } else {
-    if (stream) stream.getTracks().forEach(t => t.stop());
-    camera.srcObject = null;
-    cameraOn = false;
-    dot.classList.remove('live');
-    camLabel.textContent = 'CAMERA OFF';
-    nocam.style.display = 'flex';
-    nocam.innerHTML = 'Press START CAMERA below';
-    document.getElementById('cam-btn').textContent = '▶ Start Camera';
+  const btn = document.getElementById('compile-btn');
+  btn.disabled = true;
+  btn.textContent = 'Compiling...';
+  document.getElementById('progress-wrap').style.display = 'block';
+  document.getElementById('feature-wrap').style.display = 'none';
+  document.getElementById('download-wrap').style.display = 'none';
+
+  setProgress(5, 'Loading image...');
+
+  try {
+    const img = new Image();
+    img.src = URL.createObjectURL(selectedFile);
+    await new Promise(r => img.onload = r);
+
+    setProgress(20, 'Analysing features...');
+
+    const compiler = new MINDAR.IMAGE.Compiler();
+    const images = [img];
+
+    setProgress(35, 'Computing feature points...');
+    await new Promise(r => setTimeout(r, 100));
+
+    const dataList = await compiler.compileImageTargets(images, (progress) => {
+      setProgress(35 + Math.round(progress * 55), `Processing... ${Math.round(progress * 100)}%`);
+    });
+
+    setProgress(95, 'Exporting .mind file...');
+    await new Promise(r => setTimeout(r, 200));
+
+    const exportedBuffer = compiler.exportData();
+
+    // show feature points
+    showFeaturePoints(compiler, img);
+
+    // create download
+    const blob = new Blob([exportedBuffer]);
+    const url = URL.createObjectURL(blob);
+    const link = document.getElementById('download-link');
+    link.href = url;
+    document.getElementById('download-wrap').style.display = 'block';
+
+    setProgress(100, '✓ Compilation complete!');
+    btn.textContent = '✓ Done — Download your file below';
+
+  } catch(err) {
+    setProgress(0, '✗ Error: ' + err.message);
+    btn.disabled = false;
+    btn.textContent = '⬡ Retry Compilation';
+    console.error(err);
   }
 }
 
-// ── LOAD VIDEO ──
-function loadVideo(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const url = URL.createObjectURL(file);
-  overlayVid.src = url;
-  overlayVid.style.display = 'block';
-  placeholder.style.display = 'none';
-  overlayVid.play();
+function setProgress(pct, label) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-label').textContent = label;
 }
 
-// ── SIZE ──
-function setSize(v) {
-  overlayWrap.style.setProperty('--ov-width', v + 'px');
-  document.getElementById('size-val').textContent = v + 'px';
+function showFeaturePoints(compiler, img) {
+  const canvas = document.getElementById('feature-canvas');
+  const wrap = document.getElementById('feature-wrap');
+  wrap.style.display = 'block';
+
+  // draw image + feature points on canvas
+  const scale = Math.min(300 / img.width, 200 / img.height);
+  canvas.width = img.width * scale;
+  canvas.height = img.height * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // try to get keypoints from compiler internals
+  let pointCount = 0;
+  try {
+    const points = compiler.imageList && compiler.imageList[0] && compiler.imageList[0].points;
+    if (points) {
+      pointCount = points.length;
+      ctx.fillStyle = 'rgba(255, 80, 80, 0.8)';
+      points.forEach(p => {
+        ctx.beginPath();
+        ctx.arc(p.x * scale, p.y * scale, 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    }
+  } catch(e) {}
+
+  // quality rating
+  let quality, qlabel;
+  if (pointCount > 500) { quality = 5; qlabel = 'Excellent'; }
+  else if (pointCount > 300) { quality = 4; qlabel = 'Good'; }
+  else if (pointCount > 150) { quality = 3; qlabel = 'Fair'; }
+  else if (pointCount > 50) { quality = 2; qlabel = 'Low'; }
+  else { quality = 1; qlabel = 'Poor — try a different image'; }
+
+  for (let i = 1; i <= 5; i++) {
+    document.getElementById('d' + i).classList.toggle('on', i <= quality);
+  }
+  document.getElementById('quality-text').textContent = qlabel;
+  document.getElementById('feature-label').textContent = pointCount > 0 ? `${pointCount} feature points detected` : 'Feature points analysed';
 }
-
-// ── OPACITY ──
-function setOpacity(v) {
-  overlayVid.style.opacity = (v / 100);
-  document.getElementById('opacity-val').textContent = v + '%';
-}
-
-// ── BLEND ──
-function setBlend(v) {
-  overlayVid.style.mixBlendMode = v;
-}
-
-// ── DRAG (mouse + touch) ──
-let dragging = false;
-let startX, startY, initLeft, initTop;
-
-// Convert current transform to px offsets relative to viewport
-function getAbsolutePos() {
-  const rect = overlayWrap.getBoundingClientRect();
-  return { x: rect.left, y: rect.top };
-}
-
-function startDrag(cx, cy) {
-  dragging = true;
-  overlayWrap.classList.add('dragging');
-
-  // Switch from transform-based centering to absolute positioning
-  const vp = document.getElementById('viewport').getBoundingClientRect();
-  const rect = overlayWrap.getBoundingClientRect();
-
-  // Set explicit left/top, remove centering transform
-  overlayWrap.style.transform = 'none';
-  overlayWrap.style.left = (rect.left - vp.left) + 'px';
-  overlayWrap.style.top  = (rect.top  - vp.top)  + 'px';
-
-  startX = cx;
-  startY = cy;
-  initLeft = rect.left - vp.left;
-  initTop  = rect.top  - vp.top;
-}
-
-function moveDrag(cx, cy) {
-  if (!dragging) return;
-  const dx = cx - startX;
-  const dy = cy - startY;
-  overlayWrap.style.left = (initLeft + dx) + 'px';
-  overlayWrap.style.top  = (initTop  + dy) + 'px';
-}
-
-function endDrag() {
-  dragging = false;
-  overlayWrap.classList.remove('dragging');
-}
-
-// Mouse
-overlayWrap.addEventListener('mousedown', e => { e.preventDefault(); startDrag(e.clientX, e.clientY); });
-document.addEventListener('mousemove', e => moveDrag(e.clientX, e.clientY));
-document.addEventListener('mouseup', endDrag);
-
-// Touch
-overlayWrap.addEventListener('touchstart', e => {
-  e.preventDefault();
-  startDrag(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
-document.addEventListener('touchmove', e => {
-  e.preventDefault();
-  moveDrag(e.touches[0].clientX, e.touches[0].clientY);
-}, { passive: false });
-document.addEventListener('touchend', endDrag);
 </script>
 
 </body>
