@@ -5,7 +5,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>AR Magic Library</title>
+<title>AR Magic Library v3</title>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js"></script>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
@@ -253,6 +253,10 @@ white-space:nowrap;pointer-events:none;}
     </div>
   </div>
   <div class="wrap">
+    <div id="debug-card" class="card" style="font-size:11px;color:var(--muted);line-height:1.8;">
+      <div class="card-head">Connection Status</div>
+      <div id="debug-info">Checking...</div>
+    </div>
     <div id="admin-list" class="pairs-grid"></div>
   </div>
 </div>
@@ -359,25 +363,33 @@ const API = (path, opts={}) => fetch(`${SUPA_URL}/rest/v1/${path}`, {
   ...opts
 });
 
-// XHR-based upload — more reliable on iOS Safari for large files
+// XHR-based upload with ArrayBuffer conversion for iOS Safari
 function STORAGE(bucket, path, blob, onProgress) {
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${SUPA_URL}/storage/v1/object/${bucket}/${path}`);
-    xhr.setRequestHeader('apikey', SUPA_KEY);
-    xhr.setRequestHeader('Authorization', 'Bearer ' + SUPA_KEY);
-    xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
-    xhr.setRequestHeader('x-upsert', 'true');
-    if (onProgress) {
+    // Read file as ArrayBuffer first - fixes iOS Safari binary upload issues
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const buffer = e.target.result;
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${SUPA_URL}/storage/v1/object/${bucket}/${path}`);
+      xhr.setRequestHeader('apikey', SUPA_KEY);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + SUPA_KEY);
+      xhr.setRequestHeader('Content-Type', blob.type || 'application/octet-stream');
+      xhr.setRequestHeader('x-upsert', 'true');
       xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.round(e.loaded / e.total * 100));
+        if (e.lengthComputable && onProgress) onProgress(Math.round(e.loaded / e.total * 100));
       };
-    }
-    xhr.onload = () => resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, text: () => Promise.resolve(xhr.responseText) });
-    xhr.onerror = () => reject(new Error('Network error — check your connection'));
-    xhr.ontimeout = () => reject(new Error('Upload timed out — try a smaller file'));
-    xhr.timeout = 120000;
-    xhr.send(blob);
+      xhr.onload = () => {
+        const ok = xhr.status >= 200 && xhr.status < 300;
+        resolve({ ok, status: xhr.status, text: () => Promise.resolve(xhr.responseText) });
+      };
+      xhr.onerror = () => reject(new Error(`Network blocked (status 0). Check Supabase CORS settings allow https://danielphua85.github.io`));
+      xhr.ontimeout = () => reject(new Error('Upload timed out. Try a smaller/shorter video.'));
+      xhr.timeout = 180000; // 3 min
+      xhr.send(buffer);
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsArrayBuffer(blob);
   });
 }
 
@@ -476,6 +488,23 @@ function populateCatFilter() {
 // ══════════════════════════════════════
 // ADMIN LIST RENDER
 // ══════════════════════════════════════
+async function testConnection() {
+  const el = document.getElementById('debug-info');
+  if (!el) return;
+  try {
+    const r = await fetch(`${SUPA_URL}/rest/v1/ar_pairs?limit=1`, {
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY}
+    });
+    if (r.ok) {
+      el.innerHTML = `✅ Database: Connected<br>🌐 Project: phtxvaxdfgpvghvhoyr<br>📦 App version: v3`;
+    } else {
+      el.innerHTML = `❌ Database error: HTTP ${r.status}<br>Check Supabase RLS policies`;
+    }
+  } catch(e) {
+    el.innerHTML = `❌ Cannot reach Supabase<br>Error: ${e.message}<br>Check internet connection`;
+  }
+}
+
 function renderAdminList() {
   const el = document.getElementById('admin-list');
   if (!pairs.length) {
@@ -657,6 +686,7 @@ function doLogin() {
     document.getElementById('login-err').classList.remove('show');
     showScreen('s-admin');
     renderAdminList();
+    testConnection();
   } else {
     document.getElementById('login-err').classList.add('show');
   }
@@ -719,6 +749,10 @@ async function savePair() {
     const cleanVideoName = chosenVideo.name.replace(/[^a-zA-Z0-9._-]/g,'_');
     const photoPath = `${uid}-${cleanPhotoName}`;
     const videoPath = `${uid}-${cleanVideoName}`;
+
+    // Debug: show we got this far
+    setUpProg(8, 'Connecting to storage…');
+    await pause(300);
 
     // Upload photo
     setUpProg(10, 'Uploading photo…');
