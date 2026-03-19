@@ -191,14 +191,15 @@ padding:8px;border-radius:8px;text-align:center;display:none;}
 .debug-head{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(–muted);margin-bottom:6px;}
 
 /* TOAST */
-#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);
-padding:12px 22px;border-radius:30px;background:var(–text);color:#fff;
-font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:9999;
-box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;max-width:88vw;text-align:center;
-white-space:normal;line-height:1.5;}
+#toast{position:fixed;bottom:100px;left:50%;transform:translateX(-50%) translateY(20px);
+padding:14px 26px;border-radius:16px;background:#1e293b;color:#ffffff;
+font-size:14px;font-weight:700;opacity:0;transition:all .3s;z-index:99999;
+box-shadow:0 8px 32px rgba(0,0,0,0.35);pointer-events:none;
+max-width:88vw;text-align:center;white-space:normal;line-height:1.5;
+border:2px solid rgba(255,255,255,0.15);}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
-#toast.ok{background:var(–green);}
-#toast.err{background:var(–red);}
+#toast.ok{background:#15803d;color:#ffffff;border-color:rgba(255,255,255,0.2);}
+#toast.err{background:#b91c1c;color:#ffffff;border-color:rgba(255,255,255,0.2);}
 </style>
 
 </head>
@@ -708,15 +709,41 @@ function openDel(id) { delTarget=id; document.getElementById('modal-del').classL
 function closeDel() { delTarget=null; document.getElementById('modal-del').classList.add('hidden'); }
 async function confirmDel() {
   if (!delTarget) return;
-  const p = pairs.find(x=>x.id===delTarget); closeDel();
+  const idToDelete = delTarget;
+  const p = pairs.find(x=>x.id===idToDelete);
+  closeDel();
+  showToast('Deleting…','');
+
   try {
-    if(p.photo_url){ const f=p.photo_url.split(`/${PH_BKT}/`)[1]; if(f) await delPaths(PH_BKT,[f]); }
-    if(p.video_url){ const f=p.video_url.split(`/${VD_BKT}/`)[1]; if(f) await delPaths(VD_BKT,[f]); }
-    if(p.mind_url){  const f=p.mind_url.split(`/${MD_BKT}/`)[1];  if(f) await delPaths(MD_BKT,[f]); }
-    await API(`ar_pairs?id=eq.${delTarget}`,{method:'DELETE'});
-    showToast('Deleted ✓','ok'); await loadPairs(); renderAdmin();
-  } catch(e) { showToast('Delete failed: '+e.message,'err'); }
-  delTarget=null;
+    // Delete DB row first (most important)
+    const r = await API(`ar_pairs?id=eq.${idToDelete}`, {method:'DELETE'});
+    if (!r.ok) {
+      const t = await r.text().catch(()=>'');
+      throw new Error(`DB delete failed (${r.status}): ${t.slice(0,80)}`);
+    }
+
+    // Delete storage files in background (don't block on errors)
+    if(p && p.photo_url){ const f=p.photo_url.split(`/${PH_BKT}/`)[1]; if(f) delPaths(PH_BKT,[f]).catch(()=>{}); }
+    if(p && p.video_url){ const f=p.video_url.split(`/${VD_BKT}/`)[1]; if(f) delPaths(VD_BKT,[f]).catch(()=>{}); }
+    if(p && p.mind_url){  const f=p.mind_url.split(`/${MD_BKT}/`)[1];  if(f) delPaths(MD_BKT,[f]).catch(()=>{}); }
+
+    // Remove from local array immediately so UI updates right away
+    pairs = pairs.filter(x => x.id !== idToDelete);
+    renderAdmin();
+    renderLib();
+    populateCats();
+    showToast('✅ Deleted!','ok');
+
+    // Then refresh from server to confirm
+    await loadPairs();
+
+  } catch(e) {
+    showToast('❌ Delete failed: '+e.message,'err');
+    console.error(e);
+    // Reload to get accurate state
+    await loadPairs();
+  }
+  delTarget = null;
 }
 
 // ══════════════════════════════
