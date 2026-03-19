@@ -390,6 +390,7 @@ white-space:nowrap;pointer-events:none;box-shadow:0 4px 16px rgba(0,0,0,0.2);}
 // CONFIG
 // ══════════════════════════════
 const SUPA_URL  = 'https://phtxvaxdfgpvghvhvoyr.supabase.co';
+const SUPA_PUB  = 'sb_publishable_yzcDb1VE0a9CJi2Oi4qlNg_zmYrMorL';
 const SUPA_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBodHh2YXhkZmdwdmdodmh2b3lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM4NDI5MzUsImV4cCI6MjA4OTQxODkzNX0.Y1EizV1-y0MnsxBjxOpg74HY14G_SF19zg1evpdpu3M';
 const ADMIN_PW  = 'Phuapengming45679';
 const PH_BUCKET = 'ar-photos';
@@ -398,8 +399,10 @@ const VD_BUCKET = 'ar-videos';
 // ── REST API helper ──
 const API = (path, opts={}) => fetch(`${SUPA_URL}/rest/v1/${path}`, {
   headers:{
-    'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,
-    'Content-Type':'application/json','Prefer':'return=representation',
+    'apikey': SUPA_PUB,
+    'Authorization': 'Bearer ' + SUPA_KEY,
+    'Content-Type':'application/json',
+    'Prefer':'return=representation',
     ...(opts.headers||{})
   }, ...opts
 });
@@ -412,7 +415,7 @@ function uploadFile(bucket, path, file, onProgress) {
     reader.onload = (e) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${SUPA_URL}/storage/v1/object/${bucket}/${path}`);
-      xhr.setRequestHeader('apikey', SUPA_KEY);
+      xhr.setRequestHeader('apikey', SUPA_PUB);
       xhr.setRequestHeader('Authorization', 'Bearer ' + SUPA_KEY);
       xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
       xhr.setRequestHeader('x-upsert', 'true');
@@ -440,7 +443,7 @@ function uploadFile(bucket, path, file, onProgress) {
 const deletePaths = (bucket, paths) => fetch(
   `${SUPA_URL}/storage/v1/object/${bucket}`,
   { method:'DELETE',
-    headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
+    headers:{'apikey':SUPA_PUB,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'application/json'},
     body: JSON.stringify({prefixes: paths}) }
 );
 
