@@ -707,11 +707,17 @@ function resetFileBtn(type){
 
 function fileChosen(type,inp){
   const file=inp.files[0]; if(!file) return;
+  // Warn if video is too large (Supabase free tier limit is 50MB)
+  if(type==='video' && file.size > 48*1024*1024){
+    showToast(`⚠️ Video is ${fmtSize(file.size)} — max is 50MB. Please compress or trim it first.`,'err');
+    inp.value='';
+    return;
+  }
   if(type==='photo') chosenPhoto=file;
   else chosenVideo=file;
   const btn=document.getElementById(`btn-${type}`);
   btn.className='file-pick-btn chosen';
-  btn.querySelector('.fp-icon').textContent=type==='photo'?'✅':'✅';
+  btn.querySelector('.fp-icon').textContent='✅';
   btn.querySelector('.fp-label').childNodes[0].textContent=file.name.slice(0,28);
   btn.querySelector('.fp-size').textContent=fmtSize(file.size);
 }
