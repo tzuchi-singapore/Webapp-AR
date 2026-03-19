@@ -625,22 +625,57 @@ function stopAR(){
 // ══════ COMPILE (desktop only) ══════
 async function compileMind(imgFile,fillEl,lblEl,subEl,pctEl){
   if(isMobile)throw new Error('Compilation not supported on mobile. Use a laptop.');
+
+  // Wait for compiler script to load
   let w=0;
   while(!COMPILER_READY||typeof MINDAR==='undefined'||!MINDAR.IMAGE||!MINDAR.IMAGE.Compiler){
     await pause(500);w+=500;
     if(w>25000)throw new Error('AR compiler not loaded. Use Chrome or Edge on desktop.');
   }
+  await pause(200); // let browser breathe
+
+  // Load image
   const img=new Image();
-  img.src=URL.createObjectURL(imgFile);
-  await new Promise((res,rej)=>{img.onload=res;img.onerror=rej;});
+  const objUrl=URL.createObjectURL(imgFile);
+  img.src=objUrl;
+  await new Promise((res,rej)=>{img.onload=res;img.onerror=(e)=>rej(new Error('Image failed to load'));});
+  await pause(100);
+
+  // Compile — progress values can exceed 1, clamp them
   const compiler=new MINDAR.IMAGE.Compiler();
+  let lastPct=-1;
   await compiler.compileImageTargets([img],(prog)=>{
-    const pct=Math.min(Math.round(Math.min(Math.max(prog,0),1)*100),100);
-    if(fillEl)fillEl.style.width=pct+'%';
-    if(lblEl)lblEl.textContent=`🧠 Building AR target… ${pct}%`;
-    if(pctEl)pctEl.textContent=pct+'%';
+    const pct=Math.min(Math.round(Math.abs(prog)*100),99); // cap at 99 until export done
+    if(pct!==lastPct){
+      lastPct=pct;
+      if(fillEl)fillEl.style.width=pct+'%';
+      if(lblEl)lblEl.textContent='🧠 Building AR target… '+pct+'%';
+      if(pctEl)pctEl.textContent=pct+'%';
+      if(subEl)subEl.textContent='Analysing photo features…';
+    }
   });
-  return compiler.exportData();
+
+  // Yield to browser before export (prevents hang)
+  await pause(300);
+  if(lblEl)lblEl.textContent='🧠 Exporting AR data…';
+  if(subEl)subEl.textContent='Almost done…';
+  await pause(100);
+
+  // Export — this is sync but can be slow, yield after
+  const buf=compiler.exportData();
+  await pause(200);
+
+  // Verify we got valid data
+  if(!buf||buf.byteLength===0)throw new Error('Export produced empty data. Try a different photo.');
+
+  if(fillEl)fillEl.style.width='100%';
+  if(lblEl)lblEl.textContent='✅ AR target built!';
+  if(pctEl)pctEl.textContent='100%';
+  if(subEl)subEl.textContent='Now uploading…';
+  await pause(300);
+
+  URL.revokeObjectURL(objUrl);
+  return buf;
 }
 
 // ══════ ADD ══════
