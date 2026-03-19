@@ -38,7 +38,7 @@ border:1.5px solid var(–border);background:#fff;color:var(–blue);-webkit-app
 .tb-btn.primary{background:var(–blue);color:#fff;border-color:var(–blue);}
 
 /* WRAP */
-.wrap{width:100%;max-width:520px;padding:18px 15px 80px;display:flex;flex-direction:column;gap:13px;}
+.wrap{width:100%;max-width:520px;padding:18px 15px 100px;display:flex;flex-direction:column;gap:13px;}
 
 /* SEARCH */
 .search-bar{display:flex;gap:8px;}
@@ -191,10 +191,11 @@ padding:8px;border-radius:8px;text-align:center;display:none;}
 .debug-head{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(–muted);margin-bottom:6px;}
 
 /* TOAST */
-#toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);
+#toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);
 padding:12px 22px;border-radius:30px;background:var(–text);color:#fff;
 font-size:13px;font-weight:600;opacity:0;transition:all .3s;z-index:9999;
-box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;max-width:90vw;text-align:center;}
+box-shadow:0 4px 16px rgba(0,0,0,0.2);pointer-events:none;max-width:88vw;text-align:center;
+white-space:normal;line-height:1.5;}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 #toast.ok{background:var(–green);}
 #toast.err{background:var(–red);}
@@ -456,7 +457,7 @@ function renderLib() {
         ${p.description?`<div class="pair-desc">${p.description}</div>`:''}
         <div class="pair-footer">
           <span class="pair-date">${fmtDate(p.created_at)}</span>
-          <span class="play-chip">▶ Scan AR</span>
+          <div class="play-chip">▶ Scan AR</div>
         </div>
       </div>
     </div>`).join('');
@@ -474,7 +475,7 @@ function renderAdmin() {
         ${p.description?`<div class="pair-desc">${p.description}</div>`:''}
         <div class="pair-footer">
           <button class="del-btn" onclick="openDel('${p.id}')">🗑 Delete</button>
-          <span class="play-chip" style="cursor:pointer" onclick="launchAR('${p.id}')">▶ Test</span>
+          <button class="play-chip" style="cursor:pointer;border:none" onclick="launchAR('${p.id}')">▶ Test AR</button>
         </div>
       </div>
     </div>`).join('');
@@ -493,7 +494,10 @@ function populateCats() {
 async function launchAR(id) {
   const pair = pairs.find(p=>p.id===id);
   if (!pair) return;
-  if (!pair.mind_url) { showToast('No .mind file for this pair. Edit it in Admin.','err'); return; }
+  if (!pair.mind_url) {
+    alert('⚠️ This AR pair is missing a .mind file.\n\nTo fix it:\n1. Delete this pair in Admin\n2. Go to hiukim.github.io/mind-ar-js-doc/tools/compile on your computer\n3. Upload your photo → download the .mind file\n4. Re-add the pair with all 3 files (photo + video + .mind)');
+    return;
+  }
 
   showScreen('s-loading');
   setLD(10, pair.title, 'Loading AR files…');
