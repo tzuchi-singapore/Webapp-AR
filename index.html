@@ -641,11 +641,11 @@ async function compileMind(imgFile,fillEl,lblEl,subEl,pctEl){
   await new Promise((res,rej)=>{img.onload=res;img.onerror=(e)=>rej(new Error('Image failed to load'));});
   await pause(100);
 
-  // Compile — progress values can exceed 1, clamp them
+  // Compile — MUST capture dataList return value (required before exportData works)
   const compiler=new MINDAR.IMAGE.Compiler();
   let lastPct=-1;
-  await compiler.compileImageTargets([img],(prog)=>{
-    const pct=Math.min(Math.round(Math.abs(prog)*100),99); // cap at 99 until export done
+  const dataList = await compiler.compileImageTargets([img],(prog)=>{
+    const pct=Math.min(Math.round(Math.abs(prog)*100),99);
     if(pct!==lastPct){
       lastPct=pct;
       if(fillEl)fillEl.style.width=pct+'%';
@@ -655,24 +655,25 @@ async function compileMind(imgFile,fillEl,lblEl,subEl,pctEl){
     }
   });
 
-  // Yield to browser before export (prevents hang)
-  await pause(300);
+  // Verify dataList was returned
+  if(!dataList||dataList.length===0) throw new Error('Compilation returned no data. Try a different photo with more detail.');
+
+  // Yield before export
+  await pause(400);
   if(lblEl)lblEl.textContent='🧠 Exporting AR data…';
   if(subEl)subEl.textContent='Almost done…';
-  await pause(100);
-
-  // Export — this is sync but can be slow, yield after
-  const buf=compiler.exportData();
   await pause(200);
 
-  // Verify we got valid data
-  if(!buf||buf.byteLength===0)throw new Error('Export produced empty data. Try a different photo.');
+  // Export the compiled data to buffer
+  const buf = await compiler.exportData();
+
+  if(!buf||buf.byteLength===0) throw new Error('Export failed. Try a different photo.');
 
   if(fillEl)fillEl.style.width='100%';
-  if(lblEl)lblEl.textContent='✅ AR target built!';
+  if(lblEl)lblEl.textContent='✅ AR target ready!';
   if(pctEl)pctEl.textContent='100%';
-  if(subEl)subEl.textContent='Now uploading…';
-  await pause(300);
+  if(subEl)subEl.textContent='Now uploading files…';
+  await pause(400);
 
   URL.revokeObjectURL(objUrl);
   return buf;
