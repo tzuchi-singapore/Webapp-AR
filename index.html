@@ -625,19 +625,43 @@ async function saveEdit() {
 // ── AR SCANNER ──
 function openARFromAdmin() { startARScanner(); }
 
-async function startARScanner() {
+// Stage 1: User taps SCAN — show camera permission button immediately
+function startARScanner() {
   if (!SB_URL || !SB_KEY) { toast('AR not configured yet.','warn'); return; }
   document.getElementById('ar-screen').classList.add('show');
   document.getElementById('ar-loading').style.display = 'flex';
-  document.getElementById('ar-load-title').textContent = 'Loading AR Engine';
-  document.getElementById('ar-load-detail').textContent = 'Fetching targets...';
+  document.getElementById('ar-load-title').textContent = 'Camera Access';
+  document.getElementById('ar-load-detail').textContent = 'Tap below to allow camera';
+  // Show a big tap button — this keeps iOS gesture chain alive
+  const btn = document.createElement('button');
+  btn.id = 'cam-permit-btn';
+  btn.textContent = '📷 Allow Camera';
+  btn.style.cssText = 'margin-top:20px;padding:16px 36px;font-size:16px;font-weight:700;font-family:inherit;background:#22d3ee;color:#000;border:none;border-radius:14px;cursor:pointer;';
+  btn.onclick = requestCameraThenBuild;
+  document.getElementById('ar-loading').appendChild(btn);
+}
+
+// Stage 2: Called directly by user tap — iOS accepts this as a valid gesture
+async function requestCameraThenBuild() {
+  const btn = document.getElementById('cam-permit-btn');
+  if (btn) btn.remove();
+  document.getElementById('ar-load-title').textContent = 'Loading Targets';
+  document.getElementById('ar-load-detail').textContent = 'Please wait...';
   try {
+    // Ask for camera permission NOW while still in gesture chain
+    // This is what iOS requires to show the permission dialog
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+    // Permission granted — stop this stream and wait for iOS to fully release camera
+    stream.getTracks().forEach(t => t.stop());
+    await new Promise(r => setTimeout(r, 600));
+
     const targets = await dbFetch();
     const ready = targets.filter(t => t.mind_url && t.video_url);
     if (!ready.length) { toast('No AR targets available yet.','warn'); document.getElementById('ar-screen').classList.remove('show'); return; }
     await buildARScene(ready);
   } catch(e) {
-    toast('AR Error: '+e.message,'error');
+    const msg = e.name === 'NotAllowedError' ? 'Camera permission denied. Please allow in Settings.' : 'AR Error: '+e.message;
+    toast(msg,'error');
     document.getElementById('ar-screen').classList.remove('show');
   }
 }
