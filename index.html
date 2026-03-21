@@ -885,32 +885,32 @@ async function uploadTarget() {
   btn.disabled = true; btn.textContent = '⏳ Working...';
 
   try {
-    setProgress(true, 'Analysing image...', 0);
-    const mindBuffer = await compileMind(imgFile, p => setProgress(true, 'Compiling AR data...', p * 78));
+    setUploadProgress(true, 'Analysing image...', 0);
+    const mindBuffer = await compileMind(imgFile, p => setUploadProgress(true, 'Compiling AR data...', p * 78));
 
-    setProgress(true, 'Uploading image...', 80);
+    setUploadProgress(true, 'Uploading image...', 80);
     const imgUrl = await uploadFile(imgFile, `images/${Date.now()}_${sanitize(imgFile.name)}`);
 
-    setProgress(true, 'Uploading video...', 87);
+    setUploadProgress(true, 'Uploading video...', 87);
     const vidUrl = await uploadFile(vidFile, `videos/${Date.now()}_${sanitize(vidFile.name)}`);
 
-    setProgress(true, 'Uploading AR tracking data...', 93);
+    setUploadProgress(true, 'Uploading AR tracking data...', 93);
     const mindBlob = new Blob([mindBuffer], { type:'application/octet-stream' });
     const mindF    = new File([mindBlob], `${Date.now()}_target.mind`);
     const mindUrl  = await uploadFile(mindF, `minds/${mindF.name}`);
 
-    setProgress(true, 'Saving to library...', 98);
+    setUploadProgress(true, 'Saving to library...', 98);
     await insertRecord({ name, image_url: imgUrl, video_url: vidUrl, mind_url: mindUrl });
 
-    setProgress(true, '✓ Done!', 100);
-    setTimeout(() => setProgress(false), 1200);
+    setUploadProgress(true, '✓ Done!', 100);
+    setTimeout(() => setUploadProgress(false), 1200);
     toast('✓ Saved to library!', 'success');
     resetForm();
     switchTab('library');
   } catch(e) {
     console.error(e);
     toast('Error: ' + e.message, 'error');
-    setProgress(false);
+    setUploadProgress(false);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🚀 Compile &amp; Save to Library';
@@ -935,7 +935,7 @@ async function compileMind(imageFile, onProgress) {
   });
 }
 
-function setProgress(show, label, pct) {
+function setUploadProgress(show, label, pct) {
   const el = document.getElementById('compile-progress');
   if (!show) { el.classList.remove('show'); return; }
   el.classList.add('show');
