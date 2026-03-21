@@ -669,11 +669,10 @@ async function startARScanner() {
       return;
     }
     await buildARScene(ready);
-    // MindAR is ready — stop preview (MindAR takes over camera)
-    stopPreview();
+    // stopPreview already called inside buildARScene before MindAR starts
   } catch(e) {
     toast('AR Error: ' + e.message, 'error');
-    stopPreview();
+    stopPreview(); // ensure cleanup if buildARScene throws early
     document.getElementById('ar-screen').classList.remove('show');
   }
 }
@@ -1115,6 +1114,16 @@ async function buildARScene(targets) {
   });
   const mindBuffer = await compiler.exportData();
   const mindUrl    = URL.createObjectURL(new Blob([mindBuffer], { type:'application/octet-stream' }));
+
+  // ── CRITICAL: Stop preview stream BEFORE MindAR starts its own camera ──
+  // Both cannot run simultaneously — causes blue/black screen conflict
+  stopPreview();
+  // Show brief loading overlay during camera handover (400ms)
+  document.getElementById('ar-loading').style.display = 'flex';
+  document.getElementById('ar-load-title').textContent = 'Starting Camera';
+  document.getElementById('ar-load-detail').textContent = 'Almost ready...';
+  // Brief pause to let iOS fully release the camera before MindAR grabs it
+  await new Promise(r => setTimeout(r, 400));
 
   document.getElementById('ar-load-title').textContent = 'Starting Camera';
   document.getElementById('ar-load-detail').textContent = 'Almost ready...';
