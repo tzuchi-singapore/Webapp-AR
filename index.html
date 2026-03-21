@@ -933,10 +933,14 @@ async function buildARScene(targets) {
   // We compile a fresh combined .mind from all images at scan-time
   // This ensures all targets are tracked together
   const images = [];
+  const imageAspects = []; // store each image's aspect ratio (height/width)
   for (let i = 0; i < targets.length; i++) {
     document.getElementById('ar-loading-detail').textContent = `Loading image ${i+1}/${targets.length}...`;
     const img = await loadImageFromUrl(targets[i].image_url);
     images.push(img);
+    // Calculate aspect ratio: in MindAR, width=1 always, height = naturalHeight/naturalWidth
+    const aspect = img.naturalHeight / img.naturalWidth;
+    imageAspects.push(aspect);
   }
 
   document.getElementById('ar-loading-detail').textContent = 'Compiling combined tracking data...';
@@ -959,12 +963,15 @@ async function buildARScene(targets) {
     `<video id="arvid${i}" src="${t.video_url}" playsinline webkit-playsinline muted loop crossorigin="anonymous" preload="auto"></video>`
   ).join('\n');
 
-  // Entities
-  const entitiesHtml = targets.map((t, i) =>
-    `<a-entity id="artarget${i}" mindar-image-target="targetIndex: ${i}">
-       <a-video id="arplane${i}" src="#arvid${i}" position="0 0 0.001" rotation="0 0 0" width="1" height="0.5625" visible="false"></a-video>
-     </a-entity>`
-  ).join('\n');
+  // Entities — each video plane sized to exactly match its target image dimensions
+  const entitiesHtml = targets.map((t, i) => {
+    const aspect = imageAspects[i] || 0.5625; // fallback to 16:9
+    const planeWidth  = 1;
+    const planeHeight = aspect; // MindAR: width=1 unit = full image width, height scales accordingly
+    return `<a-entity id="artarget${i}" mindar-image-target="targetIndex: ${i}">
+       <a-video id="arplane${i}" src="#arvid${i}" position="0 0 0.001" rotation="0 0 0" width="${planeWidth}" height="${planeHeight.toFixed(4)}" visible="false"></a-video>
+     </a-entity>`;
+  }).join('\n');
 
   const sceneHtml = `
     <a-scene id="ar-scene-el"
