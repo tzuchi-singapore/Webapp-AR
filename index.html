@@ -45,23 +45,14 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important;}
 
 /* ════════════════════════════════
-   CAMERA-FIRST DESIGN
-   AR starts immediately. Guest overlay sits on top during loading.
-   Once camera is live, overlay fades away automatically.
+   GUEST LANDING — what guests see
 ════════════════════════════════ */
 #guest-screen{
   position:fixed;inset:0;z-index:100;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   background:radial-gradient(ellipse at 50% -10%,rgba(108,99,255,.25) 0%,var(--bg) 60%);
   padding:28px;
-  transition: opacity 0.6s ease;
 }
-#guest-screen.fade-out{
-  opacity:0;
-  pointer-events:none;
-}
-#guest-screen.gone{ display:none !important; }
-
 .guest-logo{
   font-family:'Space Mono',monospace;font-size:32px;font-weight:700;
   color:#fff;letter-spacing:-1px;margin-bottom:8px;text-align:center;
@@ -69,23 +60,38 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 .guest-logo span{color:var(--teal);}
 .guest-tagline{color:var(--muted);font-size:14px;text-align:center;margin-bottom:48px;letter-spacing:.5px;}
 
-/* Camera denied screen */
-#cam-denied{
-  position:fixed;inset:0;z-index:200;
-  background:var(--bg);
-  display:none;flex-direction:column;align-items:center;justify-content:center;
-  gap:16px;padding:32px;text-align:center;
+.guest-scan-btn{
+  width:140px;height:140px;border-radius:50%;border:3px solid var(--teal);
+  background:rgba(34,211,238,.08);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  transition:all .25s;position:relative;
+  box-shadow:0 0 40px rgba(34,211,238,.2);
 }
-#cam-denied.show{display:flex;}
-.denied-icon{font-size:52px;}
-.denied-title{font-size:18px;font-weight:700;color:var(--text);}
-.denied-sub{font-size:13px;color:var(--muted);line-height:1.7;max-width:300px;}
+.guest-scan-btn:hover{background:rgba(34,211,238,.15);transform:scale(1.05);box-shadow:0 0 60px rgba(34,211,238,.35);}
+.guest-scan-btn:active{transform:scale(.97);}
+.guest-scan-btn::before{
+  content:'';position:absolute;inset:-10px;border-radius:50%;
+  border:1px solid rgba(34,211,238,.25);
+  animation:ripple 2.5s ease-in-out infinite;
+}
+.guest-scan-btn::after{
+  content:'';position:absolute;inset:-20px;border-radius:50%;
+  border:1px solid rgba(34,211,238,.12);
+  animation:ripple 2.5s ease-in-out infinite .6s;
+}
+@keyframes ripple{0%{transform:scale(1);opacity:1}100%{transform:scale(1.15);opacity:0}}
+.scan-icon{font-size:44px;}
+.scan-label{font-family:'Space Mono',monospace;font-size:11px;color:var(--teal);letter-spacing:3px;text-transform:uppercase;}
+
+.guest-hint{
+  margin-top:40px;font-size:12px;color:var(--muted);text-align:center;line-height:1.7;
+}
 
 /* Invisible admin tap zone — top right corner */
 #admin-tap-zone{
   position:fixed;top:0;right:0;
   width:70px;height:70px;
-  z-index:9999;
+  z-index:500;
   cursor:default;
   -webkit-tap-highlight-color:transparent;
   background:transparent;
@@ -238,11 +244,39 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 #ar-screen{position:fixed;inset:0;z-index:8000;background:#000;display:none;flex-direction:column;}
 #ar-screen.show{display:flex;}
 
+/* Live camera preview — shows INSTANTLY, behind everything */
+#preview-video{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  object-fit:cover;
+  z-index:8010;
+}
+
+/* Compile overlay — semi-transparent, sits over live camera */
 #ar-loading{
   position:absolute;inset:0;z-index:8500;
-  background:rgba(0,0,0,.93);display:flex;flex-direction:column;
+  background:rgba(0,0,0,.55);
+  display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:14px;
 }
+/* When compiling, show a small pill at bottom instead of full dark overlay */
+#ar-loading.compiling{
+  background:transparent;
+  justify-content:flex-end;
+  padding-bottom:90px;
+}
+#compile-pill{
+  background:rgba(0,0,0,.8);
+  border:1px solid rgba(34,211,238,.4);
+  border-radius:30px;
+  padding:10px 20px;
+  display:flex;align-items:center;gap:10px;
+  display:none;
+}
+#compile-pill.show{display:flex;}
+.pill-spinner{width:16px;height:16px;border:2px solid rgba(34,211,238,.3);border-top-color:var(--teal);border-radius:50%;animation:spin 1s linear infinite;flex-shrink:0;}
+#compile-pill-text{font-family:'Space Mono',monospace;font-size:11px;color:var(--teal);letter-spacing:1px;}
+
 .ar-spinner{width:50px;height:50px;border:3px solid rgba(34,211,238,.2);border-top-color:var(--teal);border-radius:50%;animation:spin 1s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .ar-load-title{font-family:'Space Mono',monospace;font-size:12px;color:var(--teal);letter-spacing:3px;text-transform:uppercase;}
@@ -319,24 +353,19 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 <!-- ════════════════════════════════════════
      GUEST SCREEN — Default view for everyone
 ════════════════════════════════════════ -->
-<!-- Guest screen — shown briefly while AR loads, then fades away -->
 <div id="guest-screen">
   <div class="guest-logo">AR <span>Magic</span></div>
-  <div class="guest-tagline">Starting camera...</div>
-  <div style="margin-top:32px;">
-    <div class="ar-spinner" style="width:52px;height:52px;border-width:3px;"></div>
-  </div>
-</div>
+  <div class="guest-tagline">Point your camera at an image to bring it to life</div>
 
-<!-- Camera denied screen — shown if user taps Don't Allow -->
-<div id="cam-denied">
-  <div class="denied-icon">📷</div>
-  <div class="denied-title">Camera Access Needed</div>
-  <div class="denied-sub">
-    This app needs your camera to scan images.<br><br>
-    Go to <strong>Settings → Safari → Camera</strong> and set it to <strong>Allow</strong>, then come back and refresh.
-  </div>
-  <button class="btn btn-primary" onclick="location.reload()" style="margin-top:8px;">↺ Try Again</button>
+  <button class="guest-scan-btn" onclick="startARScanner()">
+    <span class="scan-icon">📷</span>
+    <span class="scan-label">Scan</span>
+  </button>
+
+  <p class="guest-hint">
+    Tap the button above to open the camera<br>
+    Then point it at any target image
+  </p>
 </div>
 
 <!-- Invisible admin tap zone — top right corner, completely hidden -->
@@ -524,10 +553,19 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
      AR SCANNER SCREEN (shared by guest & admin)
 ════════════════════════════════════════ -->
 <div id="ar-screen">
+  <!-- Instant camera preview — appears before MindAR loads -->
+  <video id="preview-video" autoplay playsinline muted></video>
+
   <div id="ar-loading">
     <div class="ar-spinner"></div>
     <div class="ar-load-title" id="ar-load-title">Loading AR Engine</div>
     <div id="ar-load-detail">Preparing...</div>
+  </div>
+
+  <!-- Small pill shown at bottom while compiling over live camera -->
+  <div id="compile-pill">
+    <div class="pill-spinner"></div>
+    <div id="compile-pill-text">Preparing AR...</div>
   </div>
   <div id="ar-hud">
     <div class="arc tl"></div><div class="arc tr"></div>
@@ -574,72 +612,80 @@ let arCallerIsAdmin = false;
 window.addEventListener('load', () => {
   SB_URL = localStorage.getItem(SB_URL_KEY) || '';
   SB_KEY = localStorage.getItem(SB_KEY_KEY) || '';
-
-  // If admin session active — go straight to admin panel
-  if (sessionStorage.getItem(SESSION_KEY) && SB_URL && SB_KEY) {
-    enterAdminMode();
-    return;
-  }
-
-  // Auto-start AR camera immediately — no tap needed
-  // This lets MindAR trigger the iOS camera permission dialog natively
-  if (SB_URL && SB_KEY) {
-    autoStartAR();
-  }
-  // If not configured yet, guest screen stays with spinner
-  // Admin can still be accessed via triple-tap top-right
+  // Guest screen is always shown by default — nothing to do
 });
-
-async function autoStartAR() {
-  try {
-    await startARScanner();
-  } catch(e) {
-    console.error('Auto-start error:', e);
-  }
-}
 
 // ════════════════════════════════
 // GUEST — AR Scanner
 // ════════════════════════════════
+// Camera preview stream — held open while compiling
+let _previewStream = null;
+
 async function startARScanner() {
   arCallerIsAdmin = false;
   if (!SB_URL || !SB_KEY) {
-    // Not configured — stay on guest screen, admin can set up via tap zone
+    toast('AR not configured yet. Contact the admin.', 'warn');
     return;
   }
 
-  // Show AR screen behind the guest overlay
+  // ── STEP 1: Show AR screen immediately ──
   document.getElementById('ar-screen').classList.add('show');
-  document.getElementById('ar-loading').style.display = 'flex';
-  document.getElementById('ar-load-title').textContent = 'Loading AR Engine';
-  document.getElementById('ar-load-detail').textContent = 'Fetching targets...';
 
+  // ── STEP 2: Open camera RIGHT NOW — this triggers iOS permission dialog ──
+  // Show minimal loading while waiting for permission only
+  document.getElementById('ar-loading').style.display = 'flex';
+  document.getElementById('ar-load-title').textContent = 'Starting Camera';
+  document.getElementById('ar-load-detail').textContent = 'Please allow camera access...';
+
+  try {
+    _previewStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    // Camera granted — show live feed IMMEDIATELY
+    const previewVid = document.getElementById('preview-video');
+    previewVid.srcObject = _previewStream;
+    // Hide the loading overlay — user now sees live camera
+    document.getElementById('ar-loading').style.display = 'none';
+    // Show small compile pill at bottom
+    document.getElementById('compile-pill').classList.add('show');
+  } catch(e) {
+    // Camera denied or error
+    document.getElementById('ar-screen').classList.remove('show');
+    document.getElementById('ar-loading').style.display = 'flex';
+    document.getElementById('ar-load-title').textContent = 'Camera Blocked';
+    document.getElementById('ar-load-detail').textContent = 'Go to Settings → Safari → Camera → Allow';
+    return;
+  }
+
+  // ── STEP 3: Compile AR data in background while user sees camera ──
   try {
     const targets = await fetchRecords();
     const ready = targets.filter(t => t.mind_url && t.video_url);
     if (!ready.length) {
-      toast('No AR targets yet. Contact admin.', 'warn');
+      toast('No AR targets available yet.', 'warn');
+      stopPreview();
       document.getElementById('ar-screen').classList.remove('show');
       return;
     }
     await buildARScene(ready);
-    // buildARScene success — fade out guest screen to reveal camera
-    fadeOutGuestScreen();
+    // MindAR is ready — stop preview (MindAR takes over camera)
+    stopPreview();
   } catch(e) {
-    console.error('AR Error:', e);
+    toast('AR Error: ' + e.message, 'error');
+    stopPreview();
     document.getElementById('ar-screen').classList.remove('show');
-    // Show camera denied / error screen
-    if (e.name === 'NotAllowedError' || e.message.includes('Permission') || e.message.includes('denied')) {
-      document.getElementById('guest-screen').classList.add('gone');
-      document.getElementById('cam-denied').classList.add('show');
-    }
   }
 }
 
-function fadeOutGuestScreen() {
-  const g = document.getElementById('guest-screen');
-  g.classList.add('fade-out');
-  setTimeout(() => g.classList.add('gone'), 700);
+function stopPreview() {
+  if (_previewStream) {
+    _previewStream.getTracks().forEach(t => t.stop());
+    _previewStream = null;
+  }
+  const v = document.getElementById('preview-video');
+  if (v) { v.srcObject = null; }
+  document.getElementById('compile-pill').classList.remove('show');
 }
 
 function openARFromAdmin() {
@@ -648,6 +694,7 @@ function openARFromAdmin() {
 }
 
 function closeARScanner() {
+  stopPreview();
   const scene = document.getElementById('ar-scene-el');
   if (scene) {
     try {
@@ -664,16 +711,6 @@ function closeARScanner() {
   document.getElementById('ar-badge').classList.remove('show');
   const old = document.getElementById('ar-mute-hint');
   if (old) old.remove();
-
-  // If guest (not admin), restore guest screen and restart camera
-  if (!sessionStorage.getItem(SESSION_KEY)) {
-    const g = document.getElementById('guest-screen');
-    g.classList.remove('fade-out', 'gone');
-    const tag = g.querySelector('.guest-tagline');
-    if (tag) tag.textContent = 'Restarting camera...';
-    // Brief pause then restart
-    setTimeout(() => autoStartAR(), 1500);
-  }
 }
 
 // ════════════════════════════════
@@ -716,23 +753,8 @@ function checkAdminLogin() {
 
 function enterAdminMode() {
   sessionStorage.setItem(SESSION_KEY, '1');
-  // Hide guest screen and camera denied screen completely
-  document.getElementById('guest-screen').classList.add('gone');
-  document.getElementById('cam-denied').classList.remove('show');
+  document.getElementById('guest-screen').classList.add('hidden');
   document.getElementById('admin-tap-zone').classList.add('hidden');
-  // Also close AR scanner if running
-  const arScreen = document.getElementById('ar-screen');
-  if (arScreen.classList.contains('show')) {
-    const scene = document.getElementById('ar-scene-el');
-    if (scene) {
-      try {
-        const sys = scene.systems && scene.systems['mindar-image-system'];
-        if (sys && sys.stop) sys.stop();
-      } catch(e) {}
-    }
-    document.getElementById('ar-scene-wrap').innerHTML = '';
-    arScreen.classList.remove('show');
-  }
   document.getElementById('admin-app').classList.remove('hidden');
   loadLibrary();
   toast('Welcome back, Admin 👋', 'success');
@@ -754,15 +776,9 @@ function handleAdminTap() {
 function adminLogout() {
   sessionStorage.removeItem(SESSION_KEY);
   document.getElementById('admin-app').classList.add('hidden');
-  // Restore guest screen and restart camera
-  const g = document.getElementById('guest-screen');
-  g.classList.remove('gone', 'fade-out', 'hidden');
-  const tag = g.querySelector('.guest-tagline');
-  if (tag) tag.textContent = 'Starting camera...';
+  document.getElementById('guest-screen').classList.remove('hidden');
   document.getElementById('admin-tap-zone').classList.remove('hidden');
   toast('Logged out', '');
-  // Auto restart camera
-  setTimeout(() => autoStartAR(), 500);
 }
 
 // ════════════════════════════════
@@ -1093,7 +1109,9 @@ async function buildARScene(targets) {
   document.getElementById('ar-load-title').textContent = 'Building Tracker';
   const compiler = new window.MINDAR.IMAGE.Compiler();
   await compiler.compileImageTargets(images, p => {
-    document.getElementById('ar-load-detail').textContent = `Compiling... ${Math.round(p*100)}%`;
+    const pct = Math.round(p*100);
+    document.getElementById('compile-pill-text').textContent = `Preparing AR... ${pct}%`;
+    document.getElementById('ar-load-detail').textContent = `Compiling... ${pct}%`;
   });
   const mindBuffer = await compiler.exportData();
   const mindUrl    = URL.createObjectURL(new Blob([mindBuffer], { type:'application/octet-stream' }));
@@ -1142,8 +1160,6 @@ async function buildARScene(targets) {
     setARStatus('Point at a target image...');
     const sys = scene.systems && scene.systems['mindar-image-system'];
     if (sys) try { sys.start(); } catch(e) {}
-    // Fade guest overlay once camera is live
-    fadeOutGuestScreen();
 
     // Reset sound state for this session
     _arMuted = true;
