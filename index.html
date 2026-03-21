@@ -1128,9 +1128,10 @@ async function buildARScene(targets) {
   setProgress(30, '30%');
   const compiler = new window.MINDAR.IMAGE.Compiler();
   await compiler.compileImageTargets(images, p => {
+    // p is 0.0 to 1.0 — do NOT multiply by 100 for display
     const pct = 30 + Math.round(p * 55);
     setProgress(pct, pct + '%');
-    document.getElementById('step2-sub').textContent = `Compiling... ${Math.round(p*100)}%`;
+    document.getElementById('step2-sub').textContent = `Compiling... ${Math.round(p * 100)}%`;
   });
   const mindBuffer = await compiler.exportData();
   const mindUrl    = URL.createObjectURL(new Blob([mindBuffer], { type:'application/octet-stream' }));
@@ -1176,12 +1177,18 @@ async function buildARScene(targets) {
 
   scene.addEventListener('loaded', () => {
     setStep(3); setProgress(100, '100%');
-    setTimeout(() => {
-      document.getElementById('ar-loading').style.display = 'none';
-    }, 300);
+
+    // ── CRITICAL: Hide loading FIRST, then start MindAR camera ──
+    // iOS will not show the camera permission dialog if the screen
+    // is covered by another element. Clear it before calling sys.start().
+    document.getElementById('ar-loading').style.display = 'none';
     setARStatus('Point at a target image...');
-    const sys = scene.systems && scene.systems['mindar-image-system'];
-    if (sys) try { sys.start(); } catch(e) {}
+
+    // Small delay to ensure loading overlay is fully gone before camera starts
+    setTimeout(() => {
+      const sys = scene.systems && scene.systems['mindar-image-system'];
+      if (sys) try { sys.start(); } catch(e) { console.warn('sys.start:', e); }
+    }, 100);
 
     // Reset sound state for this session
     _arMuted = true;
