@@ -241,27 +241,9 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 /* ════════════════════════════════
    AR SCANNER (shared)
 ════════════════════════════════ */
-#ar-screen{
-  position:fixed;
-  top:0;left:0;
-  width:100vw;
-  height:100vh;
-  /* Use dvh where supported — collapses browser chrome on mobile */
-  height:100dvh;
-  z-index:8000;
-  background:#000;
-  display:none;
-  flex-direction:column;
-  overflow:hidden;
-}
+#ar-screen{position:fixed;inset:0;z-index:8000;background:#000;display:none;flex-direction:column;}
 #ar-screen.show{display:flex;}
-#ar-scene-wrap{flex:1;position:relative;width:100%;overflow:hidden;}
-#ar-scene-wrap a-scene{
-  position:absolute!important;
-  top:0!important;left:0!important;
-  width:100%!important;
-  height:100%!important;
-}
+
 #ar-loading{
   position:absolute;inset:0;z-index:8500;
   background:rgba(0,0,0,.93);display:flex;flex-direction:column;
@@ -309,7 +291,8 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 }
 @keyframes hint-fade{0%{opacity:0}10%{opacity:1}70%{opacity:1}100%{opacity:0}}
 
-
+#ar-scene-wrap{flex:1;position:relative;}
+#ar-scene-wrap a-scene{width:100%!important;height:100%!important;}
 
 #ar-bottombar{position:absolute;bottom:0;left:0;right:0;height:64px;background:linear-gradient(to top,rgba(0,0,0,.85),transparent);display:flex;align-items:center;justify-content:center;z-index:8200;pointer-events:none;}
 #ar-status{font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,.7);letter-spacing:2px;text-transform:uppercase;}
@@ -631,6 +614,12 @@ function openARFromAdmin() {
 function closeARScanner() {
   const scene = document.getElementById('ar-scene-el');
   if (scene) {
+    // Remove orientation listener
+    if (scene._orientHandler) {
+      window.removeEventListener('orientationchange', scene._orientHandler);
+      window.removeEventListener('resize', scene._orientHandler);
+      delete scene._orientHandler;
+    }
     try {
       const sys = scene.systems && scene.systems['mindar-image-system'];
       if (sys && sys.stop) sys.stop();
@@ -1031,6 +1020,71 @@ async function buildARScene(targets) {
   const wrap = document.getElementById('ar-scene-wrap');
   wrap.innerHTML = '';
 
+  // ── Register custom stabilizer component BEFORE scene is created ──
+  // This runs every frame and applies two layers on top of MindAR's output:
+  // 1. Exponential Moving Average (EMA) — smooths position & rotation over N frames
+  // 2. Dead-zone lock — if total movement < threshold, freeze completely (no micro-jitter)
+  if (!AFRAME.components['ar-stabilizer']) {
+    AFRAME.registerComponent('ar-stabilizer', {
+      schema: {
+        smoothing:  { type: 'number', default: 0.15 }, // EMA factor: lower = smoother (0.05–0.25)
+        deadzone:   { type: 'number', default: 0.0008 } // freeze if delta below this (world units)
+      },
+      init() {
+        this._pos    = new THREE.Vector3();
+        this._quat   = new THREE.Quaternion();
+        this._smooth = new THREE.Vector3();
+        this._squat  = new THREE.Quaternion();
+        this._ready  = false;
+        this._active = false; // only stabilize when target is found
+
+        this.el.addEventListener('targetFound', () => { this._active = true; });
+        this.el.addEventListener('targetLost',  () => {
+          this._active = false;
+          this._ready  = false; // reset so next detection starts fresh
+        });
+      },
+      tick() {
+        if (!this._active) return;
+
+        const obj = this.el.object3D;
+        if (!obj.visible) return;
+
+        // Grab current raw position & rotation from MindAR
+        const rawPos  = obj.position;
+        const rawQuat = obj.quaternion;
+
+        if (!this._ready) {
+          // First frame after detection — seed smoothed values with raw values
+          this._smooth.copy(rawPos);
+          this._squat.copy(rawQuat);
+          this._ready = true;
+          return;
+        }
+
+        const alpha = this.data.smoothing;
+
+        // EMA smoothing for position
+        const newSmooth = new THREE.Vector3().lerpVectors(this._smooth, rawPos, alpha);
+
+        // Dead-zone: if movement is tiny, freeze completely
+        const delta = newSmooth.distanceTo(this._smooth);
+        if (delta < this.data.deadzone) {
+          // Movement too small — lock to last stable position
+          obj.position.copy(this._smooth);
+        } else {
+          // Movement real enough — update smoothed position
+          this._smooth.copy(newSmooth);
+          obj.position.copy(this._smooth);
+        }
+
+        // EMA smoothing for rotation (slerp)
+        this._squat.slerp(rawQuat, alpha);
+        obj.quaternion.copy(this._squat);
+      }
+    });
+  }
+
   const images = [];
   const aspects = [];
   for (let i = 0; i < targets.length; i++) {
@@ -1055,9 +1109,12 @@ async function buildARScene(targets) {
     `<video id="arvid${i}" src="${t.video_url}" playsinline webkit-playsinline muted loop crossorigin="anonymous" preload="auto"></video>`
   ).join('');
 
+  // Add ar-stabilizer to every target entity
   const entitiesHtml = targets.map((t,i) => {
     const h = (aspects[i] || 0.5625).toFixed(4);
-    return `<a-entity id="artgt${i}" mindar-image-target="targetIndex:${i}">
+    return `<a-entity id="artgt${i}"
+        mindar-image-target="targetIndex:${i}"
+        ar-stabilizer="smoothing:0.12; deadzone:0.0006;">
       <a-video id="arpl${i}" src="#arvid${i}" position="0 0 0.001" width="1" height="${h}" visible="false"
         material="shader:flat; side:double;"
       ></a-video>
@@ -1071,8 +1128,8 @@ async function buildARScene(targets) {
         uiLoading:none;
         uiScanning:none;
         uiError:none;
-        filterMinCF:0.0001;
-        filterBeta:1000;
+        filterMinCF:0.00001;
+        filterBeta:10000;
         warmupTolerance:3;
         missTolerance:10;"
       color-space="sRGB"
@@ -1092,6 +1149,20 @@ async function buildARScene(targets) {
     setARStatus('Point at a target image...');
     const sys = scene.systems && scene.systems['mindar-image-system'];
     if (sys) try { sys.start(); } catch(e) {}
+
+    // ── Landscape support: tell A-Frame to resize when phone rotates ──
+    // This is pure JS — zero CSS changes — so it cannot break the camera
+    function handleOrientationChange() {
+      // Wait for browser to finish rotating before resizing
+      setTimeout(() => {
+        // A-Frame has a built-in resize handler — just trigger a window resize event
+        window.dispatchEvent(new Event('resize'));
+      }, 300);
+    }
+    window.addEventListener('orientationchange', handleOrientationChange);
+    window.addEventListener('resize', handleOrientationChange);
+    // Store so we can remove on close
+    scene._orientHandler = handleOrientationChange;
 
     // Reset sound state for this session
     _arMuted = true;
