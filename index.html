@@ -280,26 +280,19 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
 }
 #ar-sound-btn:hover{background:rgba(255,255,255,.22);}
 #ar-sound-btn.unmuted{background:rgba(34,211,238,.2);border-color:rgba(34,211,238,.5);}
-
-/* Landscape rotate button */
-#ar-rotate-btn{
+#ar-ls-btn{
   background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);
-  color:#fff;font-size:16px;width:38px;height:38px;border-radius:8px;
+  color:#fff;font-size:15px;width:38px;height:38px;border-radius:8px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   transition:all .2s;flex-shrink:0;
 }
-#ar-rotate-btn:hover{background:rgba(255,255,255,.22);}
-#ar-rotate-btn.active{background:rgba(34,211,238,.2);border-color:rgba(34,211,238,.5);}
-
-/* CSS rotate trick — keeps camera in portrait (iOS requirement)
-   but visually rotates the whole AR screen to fill landscape */
-#ar-screen.landscape-mode{
-  transform-origin: center center;
-  transform: rotate(90deg);
-  width: 100vh !important;
-  height: 100vw !important;
-  top: calc((100vh - 100vw) / 2) !important;
-  left: calc((100vw - 100vh) / 2) !important;
+#ar-ls-btn.on{background:rgba(34,211,238,.2);border-color:rgba(34,211,238,.5);}
+#ar-screen.ls{
+  transform:rotate(90deg);
+  transform-origin:center center;
+  width:100vh;height:100vw;
+  top:calc((100vh - 100vw)/2);
+  left:calc((100vw - 100vh)/2);
 }
 /* Muted hint banner — fades in then out */
 #ar-mute-hint{
@@ -559,7 +552,7 @@ html,body{width:100%;height:100%;background:var(--bg);color:var(--text);font-fam
   <div id="ar-topbar">
     <div class="ar-live-label"><div class="ar-dot"></div>AR LIVE</div>
     <div style="display:flex;gap:8px;align-items:center;">
-      <button id="ar-rotate-btn" onclick="toggleLandscape()" title="Toggle landscape">⤢</button>
+      <button id="ar-ls-btn" onclick="toggleLS()" title="Landscape">⤢</button>
       <button id="ar-sound-btn" onclick="toggleARSound()" title="Toggle sound">🔇</button>
       <button id="ar-close" onclick="closeARScanner()">✕ Close</button>
     </div>
@@ -636,23 +629,17 @@ function openARFromAdmin() {
 function closeARScanner() {
   const scene = document.getElementById('ar-scene-el');
   if (scene) {
-    if (scene._orientHandler) {
-      window.removeEventListener('orientationchange', scene._orientHandler);
-      window.removeEventListener('resize', scene._orientHandler);
-      delete scene._orientHandler;
-    }
     try {
       const sys = scene.systems && scene.systems['mindar-image-system'];
       if (sys && sys.stop) sys.stop();
     } catch(e) {}
     document.querySelectorAll('#ar-scene-wrap video').forEach(v => { v.pause(); v.src=''; });
   }
-  // Reset landscape mode
-  _isLandscape = false;
-  const arScreen = document.getElementById('ar-screen');
-  arScreen.classList.remove('landscape-mode');
-  const rotBtn = document.getElementById('ar-rotate-btn');
-  if (rotBtn) { rotBtn.classList.remove('active'); rotBtn.textContent = '⤢'; }
+  // Reset landscape
+  _ls = false;
+  document.getElementById('ar-screen').classList.remove('ls');
+  const lb = document.getElementById('ar-ls-btn');
+  if (lb) { lb.classList.remove('on'); lb.textContent = '⤢'; }
 
   _activeVideos = new Set();
   _arMuted = true;
@@ -1048,71 +1035,6 @@ async function buildARScene(targets) {
   const wrap = document.getElementById('ar-scene-wrap');
   wrap.innerHTML = '';
 
-  // ── Register custom stabilizer component BEFORE scene is created ──
-  // This runs every frame and applies two layers on top of MindAR's output:
-  // 1. Exponential Moving Average (EMA) — smooths position & rotation over N frames
-  // 2. Dead-zone lock — if total movement < threshold, freeze completely (no micro-jitter)
-  if (!AFRAME.components['ar-stabilizer']) {
-    AFRAME.registerComponent('ar-stabilizer', {
-      schema: {
-        smoothing:  { type: 'number', default: 0.15 }, // EMA factor: lower = smoother (0.05–0.25)
-        deadzone:   { type: 'number', default: 0.0008 } // freeze if delta below this (world units)
-      },
-      init() {
-        this._pos    = new THREE.Vector3();
-        this._quat   = new THREE.Quaternion();
-        this._smooth = new THREE.Vector3();
-        this._squat  = new THREE.Quaternion();
-        this._ready  = false;
-        this._active = false; // only stabilize when target is found
-
-        this.el.addEventListener('targetFound', () => { this._active = true; });
-        this.el.addEventListener('targetLost',  () => {
-          this._active = false;
-          this._ready  = false; // reset so next detection starts fresh
-        });
-      },
-      tick() {
-        if (!this._active) return;
-
-        const obj = this.el.object3D;
-        if (!obj.visible) return;
-
-        // Grab current raw position & rotation from MindAR
-        const rawPos  = obj.position;
-        const rawQuat = obj.quaternion;
-
-        if (!this._ready) {
-          // First frame after detection — seed smoothed values with raw values
-          this._smooth.copy(rawPos);
-          this._squat.copy(rawQuat);
-          this._ready = true;
-          return;
-        }
-
-        const alpha = this.data.smoothing;
-
-        // EMA smoothing for position
-        const newSmooth = new THREE.Vector3().lerpVectors(this._smooth, rawPos, alpha);
-
-        // Dead-zone: if movement is tiny, freeze completely
-        const delta = newSmooth.distanceTo(this._smooth);
-        if (delta < this.data.deadzone) {
-          // Movement too small — lock to last stable position
-          obj.position.copy(this._smooth);
-        } else {
-          // Movement real enough — update smoothed position
-          this._smooth.copy(newSmooth);
-          obj.position.copy(this._smooth);
-        }
-
-        // EMA smoothing for rotation (slerp)
-        this._squat.slerp(rawQuat, alpha);
-        obj.quaternion.copy(this._squat);
-      }
-    });
-  }
-
   const images = [];
   const aspects = [];
   for (let i = 0; i < targets.length; i++) {
@@ -1137,12 +1059,9 @@ async function buildARScene(targets) {
     `<video id="arvid${i}" src="${t.video_url}" playsinline webkit-playsinline muted loop crossorigin="anonymous" preload="auto"></video>`
   ).join('');
 
-  // Add ar-stabilizer to every target entity
   const entitiesHtml = targets.map((t,i) => {
     const h = (aspects[i] || 0.5625).toFixed(4);
-    return `<a-entity id="artgt${i}"
-        mindar-image-target="targetIndex:${i}"
-        ar-stabilizer="smoothing:0.12; deadzone:0.0006;">
+    return `<a-entity id="artgt${i}" mindar-image-target="targetIndex:${i}">
       <a-video id="arpl${i}" src="#arvid${i}" position="0 0 0.001" width="1" height="${h}" visible="false"
         material="shader:flat; side:double;"
       ></a-video>
@@ -1156,8 +1075,8 @@ async function buildARScene(targets) {
         uiLoading:none;
         uiScanning:none;
         uiError:none;
-        filterMinCF:0.00001;
-        filterBeta:10000;
+        filterMinCF:0.0001;
+        filterBeta:1000;
         warmupTolerance:3;
         missTolerance:10;"
       color-space="sRGB"
@@ -1177,20 +1096,6 @@ async function buildARScene(targets) {
     setARStatus('Point at a target image...');
     const sys = scene.systems && scene.systems['mindar-image-system'];
     if (sys) try { sys.start(); } catch(e) {}
-
-    // ── Landscape support: tell A-Frame to resize when phone rotates ──
-    // This is pure JS — zero CSS changes — so it cannot break the camera
-    function handleOrientationChange() {
-      // Wait for browser to finish rotating before resizing
-      setTimeout(() => {
-        // A-Frame has a built-in resize handler — just trigger a window resize event
-        window.dispatchEvent(new Event('resize'));
-      }, 300);
-    }
-    window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('resize', handleOrientationChange);
-    // Store so we can remove on close
-    scene._orientHandler = handleOrientationChange;
 
     // Reset sound state for this session
     _arMuted = true;
@@ -1250,25 +1155,13 @@ function loadImgFromUrl(url) {
 
 function setARStatus(t) { document.getElementById('ar-status').textContent = t; }
 
-// ── Landscape toggle ──────────────────────────────
-// Uses CSS transform to rotate the AR screen 90°.
-// The camera stays in portrait mode (iOS Safari requirement) —
-// we just visually spin the display to fill landscape.
-let _isLandscape = false;
-function toggleLandscape() {
-  const screen = document.getElementById('ar-screen');
-  const btn    = document.getElementById('ar-rotate-btn');
-  _isLandscape = !_isLandscape;
-  if (_isLandscape) {
-    screen.classList.add('landscape-mode');
-    btn.classList.add('active');
-    btn.textContent = '⤡'; // icon flips to indicate "restore portrait"
-    toast('Landscape mode ON — tap ⤡ to go back', '');
-  } else {
-    screen.classList.remove('landscape-mode');
-    btn.classList.remove('active');
-    btn.textContent = '⤢';
-  }
+let _ls = false;
+function toggleLS() {
+  _ls = !_ls;
+  const s = document.getElementById('ar-screen');
+  const b = document.getElementById('ar-ls-btn');
+  if (_ls) { s.classList.add('ls');  b.classList.add('on'); b.textContent='⤡'; }
+  else      { s.classList.remove('ls'); b.classList.remove('on'); b.textContent='⤢'; }
 }
 
 // ── Sound control ──────────────────────────────
