@@ -245,7 +245,8 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
       <button class="tab-btn active" id="tab-upload-btn" onclick="switchTab('upload')">＋ Upload</button>
       <button class="tab-btn" id="tab-library-btn" onclick="switchTab('library')">📚 Library</button>
     </div>
-    <div style="display:flex;gap:6px;">
+    <div style="display:flex;gap:6px;align-items:center;">
+      <span id="sb-status" style="font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;"></span>
       <button class="btn btn-ghost" style="font-size:12px;padding:7px 12px;" onclick="openARFromAdmin()">📷 Scan</button>
       <button class="btn btn-ghost" style="font-size:12px;padding:7px 10px;" onclick="adminLogout()">🚪</button>
     </div>
@@ -354,7 +355,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('=== AR Magic v18e tzuchi ===');
+console.log('=== AR Magic v18f ===');
 
 // ── AR STABILISER (double-smoothing: lerp pos + slerp rot) ──
 AFRAME.registerComponent('ar-stabilizer', {
@@ -438,8 +439,19 @@ function enterAdmin() {
   document.getElementById('guest-screen').classList.add('hidden');
   document.getElementById('admin-tap-zone').classList.add('hidden');
   document.getElementById('admin-app').classList.remove('hidden');
+  // Show credential status indicator
+  const sb = document.getElementById('sb-status');
+  if (sb) {
+    if (SB_URL && SB_KEY) {
+      sb.textContent = '✓ Supabase';
+      sb.style.cssText += 'background:rgba(16,185,129,.2);color:#10b981;border:1px solid rgba(16,185,129,.3);';
+    } else {
+      sb.textContent = '⚠ No DB';
+      sb.style.cssText += 'background:rgba(239,68,68,.2);color:#ef4444;border:1px solid rgba(239,68,68,.3);';
+    }
+  }
   loadLibrary();
-  toast('Welcome back, Admin 👋', 'success');
+  toast(SB_URL && SB_KEY ? 'Welcome back, Admin 👋' : '⚠️ Supabase not configured — please logout and setup', SB_URL && SB_KEY ? 'success' : 'error');
 }
 function adminLogout() {
   sessionStorage.removeItem(SESSION);
@@ -508,6 +520,7 @@ function showUploadProgress(show, label, pct) {
 }
 
 async function uploadTarget() {
+  if (!SB_URL || !SB_KEY) { toast('⚠️ Supabase not configured. Tap 🚪 logout then setup again.', 'error'); return; }
   const name = document.getElementById('target-name').value.trim();
   if (!name) { toast('Enter a target name', 'error'); return; }
   if (!imgFile) { toast('Select an image', 'error'); return; }
@@ -599,11 +612,15 @@ async function dbDelete(id, mind_url, image_url, video_url) {
 // ── LIBRARY ──
 async function loadLibrary() {
   const grid = document.getElementById('library-grid');
+  if (!SB_URL || !SB_KEY) {
+    grid.innerHTML = '<div class="lib-empty"><div class="ei">⚠️</div>Supabase not configured.<br><small style="color:var(--amber)">Logout and re-enter your credentials</small></div>';
+    return;
+  }
   grid.innerHTML = '<div class="lib-empty"><div class="ei">⏳</div>Loading...</div>';
   try {
     libraryData = await dbFetch();
     renderLibrary(libraryData);
-  } catch(e) { grid.innerHTML = `<div class="lib-empty"><div class="ei">⚠️</div>${e.message}</div>`; }
+  } catch(e) { grid.innerHTML = `<div class="lib-empty"><div class="ei">⚠️</div><b>Error:</b> ${e.message}<br><small style='color:var(--amber)'>Check your Supabase URL and key</small></div>`; }
 }
 function renderLibrary(items) {
   const grid = document.getElementById('library-grid');
