@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-<title>AR Magic Library</title>
+<title>AR Magic v19</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
@@ -245,8 +245,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
       <button class="tab-btn active" id="tab-upload-btn" onclick="switchTab('upload')">＋ Upload</button>
       <button class="tab-btn" id="tab-library-btn" onclick="switchTab('library')">📚 Library</button>
     </div>
-    <div style="display:flex;gap:6px;align-items:center;">
-      <span id="sb-status" style="font-size:10px;padding:3px 8px;border-radius:20px;font-weight:700;"></span>
+    <div style="display:flex;gap:6px;">
       <button class="btn btn-ghost" style="font-size:12px;padding:7px 12px;" onclick="openARFromAdmin()">📷 Scan</button>
       <button class="btn btn-ghost" style="font-size:12px;padding:7px 10px;" onclick="adminLogout()">🚪</button>
     </div>
@@ -255,12 +254,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
     <!-- UPLOAD TAB -->
     <div class="tab-panel active" id="panel-upload">
       <div class="section-title">✦ Add New AR Target</div>
-      <div class="section-sub">Upload image + video. AR tracking is compiled automatically.</div>
-      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(255,200,50,.9);margin-bottom:16px;line-height:1.7;">
-        💡 <b>If compile crashes:</b> Use the <b>Manual .mind</b> option below — compile your image at
-        <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile" target="_blank" style="color:#22d3ee;">MindAR Compiler ↗</a>
-        on a computer, then upload the .mind file here.
-      </div>
+      <div class="section-sub">Upload image + video. AR tracking is compiled automatically in your browser.</div>
       <div class="upload-card">
         <h3>① Target Name</h3>
         <div class="field" style="margin-bottom:0"><input id="target-name" type="text" placeholder="e.g. Exercise Card 1..." style="background:var(--bg);font-size:15px;"/></div>
@@ -291,26 +285,11 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
           <button class="preview-remove" onclick="clearVideo()">✕</button>
         </div>
       </div>
-      <div class="upload-card" id="mind-upload-card">
-        <h3>④ .mind File <span style="color:var(--green);font-size:10px;font-weight:700;padding:2px 6px;background:rgba(16,185,129,.15);border-radius:10px;margin-left:4px;">OPTIONAL</span></h3>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Skip browser compilation — upload a pre-compiled .mind file instead. Get it free at <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile" target="_blank" style="color:var(--teal);">MindAR compiler</a>.</div>
-        <div class="drop-zone" id="mind-drop" onclick="document.getElementById('mind-input').click()">
-          <input type="file" id="mind-input" accept=".mind" style="display:none" onchange="handleMindSelect(this)"/>
-          <div class="drop-icon">🎯</div>
-          <div class="drop-label"><strong>Tap to choose .mind file</strong><br>Pre-compiled tracking data</div>
-        </div>
-        <div class="preview-box hidden" id="mind-preview">
-          <div class="preview-thumb vid-icon">🎯</div>
-          <div class="preview-info"><div class="preview-name" id="mind-fname"></div><div class="preview-size" id="mind-fsize"></div></div>
-          <button class="preview-remove" onclick="clearMind()">✕</button>
-        </div>
-      </div>
       <div class="compile-progress" id="compile-progress">
         <div class="progress-label" id="compile-label">Working...</div>
         <div class="progress-bar-wrap"><div class="progress-bar" id="progress-bar"></div></div>
         <div class="progress-pct" id="progress-pct">0%</div>
       </div>
-      <div id="upload-error-box" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:12px 14px;font-size:13px;color:#ef4444;margin-bottom:12px;word-break:break-all;line-height:1.5;"></div>
       <button class="btn btn-primary" id="upload-btn" style="width:100%;padding:14px;font-size:15px;margin-top:4px;" onclick="uploadTarget()">
         🚀 Compile &amp; Save to Library
       </button>
@@ -350,10 +329,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
     <div class="ar-spinner"></div>
     <div class="ar-load-title" id="ar-load-title">Loading AR Engine</div>
     <div id="ar-load-detail">Preparing...</div>
-    <div id="ar-load-bar-wrap" style="width:240px;height:4px;background:rgba(255,255,255,.1);border-radius:4px;margin-top:16px;overflow:hidden;display:none;">
-      <div id="ar-load-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#6c63ff);border-radius:4px;transition:width .4s ease;"></div>
-    </div>
-    <div id="ar-load-tip" style="font-size:11px;color:rgba(255,255,255,.3);margin-top:10px;text-align:center;max-width:240px;line-height:1.6;display:none;"></div>
+    <div id="ar-progress-wrap" style="width:240px;height:4px;background:rgba(255,255,255,.1);border-radius:4px;margin-top:16px;overflow:hidden;display:none;"><div id="ar-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#6c63ff);border-radius:4px;"></div></div>
   </div>
   <div id="ar-hud">
     <div class="arc tl"></div><div class="arc tr"></div>
@@ -375,21 +351,8 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('=== AR Magic v18i ===');
-
-// ── AR STABILISER (double-smoothing: lerp pos + slerp rot) ──
-AFRAME.registerComponent('ar-stabilizer', {
-  schema:{alpha:{type:'number',default:0.2}},
-  init:function(){this.sp=new THREE.Vector3();this.sq=new THREE.Quaternion();this.rdy=false;},
-  tick:function(){
-    const o=this.el.object3D;
-    if(!o.visible){this.rdy=false;return;}
-    if(!this.rdy){this.sp.copy(o.position);this.sq.copy(o.quaternion);this.rdy=true;return;}
-    const a=this.data.alpha;
-    this.sp.lerp(o.position,a);this.sq.slerp(o.quaternion,a);
-    o.position.copy(this.sp);o.quaternion.copy(this.sq);
-  }
-});
+console.log('AR Magic v19');
+AFRAME.registerComponent('ar-stabilizer',{schema:{alpha:{type:'number',default:0.2}},init:function(){this.sp=new THREE.Vector3();this.sq=new THREE.Quaternion();this.rdy=false;},tick:function(){const o=this.el.object3D;if(!o.visible){this.rdy=false;return;}if(!this.rdy){this.sp.copy(o.position);this.sq.copy(o.quaternion);this.rdy=true;return;}const a=this.data.alpha;this.sp.lerp(o.position,a);this.sq.slerp(o.quaternion,a);o.position.copy(this.sp);o.quaternion.copy(this.sq);}});
 
 // ── CONFIG ──
 const BUCKET = 'ar-assets';
@@ -400,7 +363,7 @@ const KEY_KEY = 'arlive_key';
 const SESSION = 'arlive_session';
 
 let SB_URL = '', SB_KEY = '';
-let imgFile = null, vidFile = null, mindFile = null;
+let imgFile = null, vidFile = null;
 let libraryData = [];
 let _arMuted = true;
 let _activeVideos = new Set();
@@ -459,19 +422,8 @@ function enterAdmin() {
   document.getElementById('guest-screen').classList.add('hidden');
   document.getElementById('admin-tap-zone').classList.add('hidden');
   document.getElementById('admin-app').classList.remove('hidden');
-  // Show credential status indicator
-  const sb = document.getElementById('sb-status');
-  if (sb) {
-    if (SB_URL && SB_KEY) {
-      sb.textContent = '✓ Supabase';
-      sb.style.cssText += 'background:rgba(16,185,129,.2);color:#10b981;border:1px solid rgba(16,185,129,.3);';
-    } else {
-      sb.textContent = '⚠ No DB';
-      sb.style.cssText += 'background:rgba(239,68,68,.2);color:#ef4444;border:1px solid rgba(239,68,68,.3);';
-    }
-  }
   loadLibrary();
-  toast(SB_URL && SB_KEY ? 'Welcome back, Admin 👋' : '⚠️ Supabase not configured — please logout and setup', SB_URL && SB_KEY ? 'success' : 'error');
+  toast('Welcome back, Admin 👋', 'success');
 }
 function adminLogout() {
   sessionStorage.removeItem(SESSION);
@@ -527,15 +479,6 @@ function handleVideoSelect(input) {
 }
 function clearImage() { imgFile=null; document.getElementById('img-input').value=''; document.getElementById('img-preview').classList.add('hidden'); document.getElementById('img-drop').style.display=''; }
 function clearVideo() { vidFile=null; document.getElementById('vid-input').value=''; document.getElementById('vid-preview').classList.add('hidden'); document.getElementById('vid-drop').style.display=''; }
-function handleMindSelect(input) {
-  const f = input.files[0]; if (!f) return;
-  mindFile = f;
-  document.getElementById('mind-fname').textContent = f.name;
-  document.getElementById('mind-fsize').textContent = fmtSize(f.size);
-  document.getElementById('mind-preview').classList.remove('hidden');
-  document.getElementById('mind-drop').style.display = 'none';
-}
-function clearMind() { mindFile=null; document.getElementById('mind-input').value=''; document.getElementById('mind-preview').classList.add('hidden'); document.getElementById('mind-drop').style.display=''; }
 function fmtSize(b) { if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
 
 // ── UPLOAD COMPILE ──
@@ -549,29 +492,16 @@ function showUploadProgress(show, label, pct) {
 }
 
 async function uploadTarget() {
-  if (!SB_URL || !SB_KEY) { toast('⚠️ Supabase not configured. Tap 🚪 logout then setup again.', 'error'); return; }
   const name = document.getElementById('target-name').value.trim();
   if (!name) { toast('Enter a target name', 'error'); return; }
   if (!imgFile) { toast('Select an image', 'error'); return; }
   if (!vidFile) { toast('Select a video', 'error'); return; }
   const btn = document.getElementById('upload-btn');
   btn.disabled = true; btn.textContent = '⏳ Working...';
-  const errBox = document.getElementById('upload-error-box');
-  if (errBox) errBox.style.display = 'none';
   try {
-    let mindBuffer;
-    if (mindFile) {
-      // Use pre-compiled .mind file — skip browser compilation
-      showUploadProgress(true, 'Reading .mind file...', 10);
-      mindBuffer = await mindFile.arrayBuffer();
-      showUploadProgress(true, 'Uploading image...', 30);
-    } else {
-      // Compile in browser
-      showUploadProgress(true, 'Analysing image...', 0);
-      mindBuffer = await compileMindFile(imgFile, p => showUploadProgress(true, 'Compiling... ' + Math.round(p*100) + '%', p * 78));
-      showUploadProgress(true, 'Uploading image...', 80);
-    }
-    showUploadProgress(true, 'Uploading image...', mindFile ? 35 : 80);
+    showUploadProgress(true, 'Analysing image...', 0);
+    const mindBuffer = await compileMindFile(imgFile, p => showUploadProgress(true, 'Compiling AR data...', p * 78));
+    showUploadProgress(true, 'Uploading image...', 80);
     const imgUrl = await uploadFile(imgFile, `images/${Date.now()}_${clean(imgFile.name)}`);
     showUploadProgress(true, 'Uploading video...', 87);
     const vidUrl = await uploadFile(vidFile, `videos/${Date.now()}_${clean(vidFile.name)}`);
@@ -584,18 +514,11 @@ async function uploadTarget() {
     setTimeout(() => showUploadProgress(false), 1200);
     toast('✓ Saved to library!', 'success');
     document.getElementById('target-name').value = '';
-    clearImage(); clearVideo(); clearMind();
+    clearImage(); clearVideo();
     switchTab('library');
   } catch(e) {
+    toast('Error: ' + e.message, 'error');
     showUploadProgress(false);
-    // Show error prominently inside the panel so it can't be missed
-    const errBox = document.getElementById('upload-error-box');
-    if (errBox) {
-      errBox.textContent = '❌ ' + e.message;
-      errBox.style.display = 'block';
-      setTimeout(() => { errBox.style.display = 'none'; }, 20000);
-    }
-    toast('Upload failed: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🚀 Compile &amp; Save to Library';
@@ -625,7 +548,7 @@ function clean(name) { return name.replace(/[^a-zA-Z0-9._-]/g, '_'); }
 // ── SUPABASE ──
 async function uploadFile(file, path) {
   const res = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${path}`, {
-    method:'POST', headers:{'Authorization':`Bearer ${SB_KEY}`,'apikey':SB_KEY,'x-upsert':'true','Content-Type':file.type||'application/octet-stream'}, body:file
+    method:'POST', headers:{'Authorization':`Bearer ${SB_KEY}`,'x-upsert':'true','Content-Type':file.type||'application/octet-stream'}, body:file
   });
   if (!res.ok) { const e=await res.text(); throw new Error(`Upload failed (${res.status}): ${e}`); }
   return `${SB_URL}/storage/v1/object/public/${BUCKET}/${path}`;
@@ -660,15 +583,11 @@ async function dbDelete(id, mind_url, image_url, video_url) {
 // ── LIBRARY ──
 async function loadLibrary() {
   const grid = document.getElementById('library-grid');
-  if (!SB_URL || !SB_KEY) {
-    grid.innerHTML = '<div class="lib-empty"><div class="ei">⚠️</div>Supabase not configured.<br><small style="color:var(--amber)">Logout and re-enter your credentials</small></div>';
-    return;
-  }
   grid.innerHTML = '<div class="lib-empty"><div class="ei">⏳</div>Loading...</div>';
   try {
     libraryData = await dbFetch();
     renderLibrary(libraryData);
-  } catch(e) { grid.innerHTML = `<div class="lib-empty"><div class="ei">⚠️</div><b>Error:</b> ${e.message}<br><small style='color:var(--amber)'>Check your Supabase URL and key</small></div>`; }
+  } catch(e) { grid.innerHTML = `<div class="lib-empty"><div class="ei">⚠️</div>${e.message}</div>`; }
 }
 function renderLibrary(items) {
   const grid = document.getElementById('library-grid');
@@ -717,28 +636,27 @@ async function saveEdit() {
 // ── AR SCANNER ──
 function openARFromAdmin() { startARScanner(); }
 
-// ── PROGRESS BAR (time-based, 35s) ──
+// ── PROGRESS BAR (time-based, 35s 0→100%) ──
 let _progressTimer = null, _progressPct = 0;
 function startProgressBar() {
   _progressPct = 0;
-  const bar = document.getElementById('ar-load-bar');
-  const wrap = document.getElementById('ar-load-bar-wrap');
+  const bar = document.getElementById('ar-progress-bar');
+  const wrap = document.getElementById('ar-progress-wrap');
   if (wrap) wrap.style.display = 'block';
-  if (bar) { bar.style.transition = 'none'; bar.style.width = '0%'; }
+  if (bar) { bar.style.transition='none'; bar.style.width='0%'; }
   clearInterval(_progressTimer);
   _progressTimer = setInterval(() => {
-    _progressPct += 1;
-    if (_progressPct >= 99) { _progressPct = 99; clearInterval(_progressTimer); }
-    if (bar) { bar.style.transition = 'width .35s linear'; bar.style.width = _progressPct + '%'; }
+    _progressPct = Math.min(99, _progressPct+1);
+    if (bar) { bar.style.transition='width .35s linear'; bar.style.width=_progressPct+'%'; }
   }, 350);
 }
 function finishProgressBar() {
   clearInterval(_progressTimer);
-  const bar = document.getElementById('ar-load-bar');
-  if (bar) { bar.style.transition = 'width .4s ease'; bar.style.width = '100%'; }
+  const bar = document.getElementById('ar-progress-bar');
+  if (bar) { bar.style.transition='width .4s ease'; bar.style.width='100%'; }
 }
 
-// Stage 1: show Allow Camera button (keeps iOS gesture chain alive)
+// Stage 1: show button immediately (keeps iOS gesture chain alive)
 function startARScanner() {
   if (!SB_URL || !SB_KEY) { toast('AR not configured yet.','warn'); return; }
   document.getElementById('ar-screen').classList.add('show');
@@ -753,7 +671,7 @@ function startARScanner() {
   document.getElementById('ar-loading').appendChild(btn);
 }
 
-// Stage 2: called directly by tap — iOS shows permission dialog
+// Stage 2: direct tap → iOS shows camera permission
 async function requestCameraThenBuild() {
   const btn = document.getElementById('cam-permit-btn');
   if (btn) btn.remove();
@@ -769,8 +687,8 @@ async function requestCameraThenBuild() {
     if (!ready.length) { toast('No AR targets available yet.','warn'); document.getElementById('ar-screen').classList.remove('show'); return; }
     await buildARScene(ready);
   } catch(e) {
-    const msg = e.name === 'NotAllowedError' ? 'Camera permission denied. Please allow in Settings.' : 'AR Error: '+e.message;
-    toast(msg,'error');
+    const msg = e.name==='NotAllowedError' ? 'Camera denied. Go to Settings → Safari → Camera → Allow.' : 'AR Error: '+e.message;
+    toast(msg, 'error');
     document.getElementById('ar-screen').classList.remove('show');
   }
 }
@@ -779,15 +697,9 @@ async function buildARScene(targets) {
   const wrap = document.getElementById('ar-scene-wrap');
   wrap.innerHTML = '';
 
-  const tips = ['Hold the image flat and steady','Good lighting helps accuracy','Point camera at the full image','Works best on printed images'];
-  const tip = tips[Math.floor(Math.random()*tips.length)];
-  const tipEl = document.getElementById('ar-load-tip');
-  if (tipEl) { tipEl.style.display='block'; tipEl.textContent='💡 Tip: '+tip; }
-
   const images = [], aspects = [];
   for (let i = 0; i < targets.length; i++) {
-    document.getElementById('ar-load-title').textContent = 'Loading Images';
-    document.getElementById('ar-load-detail').textContent = `Image ${i+1} of ${targets.length}...`;
+    document.getElementById('ar-load-detail').textContent = `Loading image ${i+1}/${targets.length}...`;
     const img = await loadImg(targets[i].image_url);
     images.push(img);
     aspects.push(img.naturalHeight / img.naturalWidth);
@@ -796,13 +708,13 @@ async function buildARScene(targets) {
   document.getElementById('ar-load-title').textContent = 'Building Tracker';
   const compiler = new window.MINDAR.IMAGE.Compiler();
   await compiler.compileImageTargets(images, p => {
-    const secs = Math.round((1-p)*20);
-    document.getElementById('ar-load-detail').textContent = `Processing... ${Math.round(p*100)}%${secs>2?' (~'+secs+'s left)':''}`;
+    document.getElementById('ar-load-detail').textContent = `Compiling... ${Math.round(p * 100)}%`;
   });
   const mindBuffer = await compiler.exportData();
   const mindUrl = URL.createObjectURL(new Blob([mindBuffer], {type:'application/octet-stream'}));
+
   document.getElementById('ar-load-title').textContent = 'Starting Camera';
-  document.getElementById('ar-load-detail').textContent = 'Opening camera...';
+  document.getElementById('ar-load-detail').textContent = 'Almost ready...';
 
   const assetsHtml = targets.map((t,i) =>
     `<video id="arvid${i}" src="${t.video_url}" playsinline webkit-playsinline muted loop crossorigin="anonymous" preload="auto"></video>`
@@ -830,20 +742,11 @@ async function buildARScene(targets) {
 
   const scene = document.getElementById('ar-scene-el');
 
-  scene.addEventListener('arError', () => {
-    document.getElementById('ar-loading').style.display = 'none';
-    toast('AR failed to start. Please try again.', 'error');
-  });
-
-  scene.addEventListener('arReady', () => {
-    finishProgressBar();
-    document.getElementById('ar-load-title').textContent = 'Ready! 🎯';
-    document.getElementById('ar-load-detail').textContent = 'Point at a target image';
-    setTimeout(() => { document.getElementById('ar-loading').style.display = 'none'; setARStatus('Point at a target image...'); }, 400);
-  });
+  scene.addEventListener('arReady', () => { finishProgressBar(); });
 
   scene.addEventListener('loaded', () => {
-    document.getElementById('ar-loading').style.display = 'none';
+    finishProgressBar();
+    setTimeout(() => { document.getElementById('ar-loading').style.display = 'none'; }, 300);
     setARStatus('Point at a target image...');
     const sys = scene.systems && scene.systems['mindar-image-system'];
     if (sys) try { sys.start(); } catch(e) {}
@@ -939,14 +842,9 @@ function showMuteHint() {
 function toast(msg, type='') {
   const wrap = document.getElementById('toast-wrap');
   const el = document.createElement('div');
-  el.className = 'toast ' + type;
-  el.textContent = msg;
-  el.style.cursor = 'pointer';
-  el.onclick = () => el.remove();
+  el.className = 'toast ' + type; el.textContent = msg;
   wrap.appendChild(el);
-  // Errors stay 12s, others 4s
-  const dur = type === 'error' ? 12000 : 4000;
-  setTimeout(() => { if (el.parentNode) el.remove(); }, dur);
+  setTimeout(() => el.remove(), 3500);
 }
 
 // ── KEYBOARD ──
