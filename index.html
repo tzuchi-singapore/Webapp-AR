@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-<title>AR Magic v20</title>
+<title>AR Magic v21</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
@@ -254,7 +254,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
     <!-- UPLOAD TAB -->
     <div class="tab-panel active" id="panel-upload">
       <div class="section-title">✦ Add New AR Target</div>
-      <div class="section-sub">Upload image + video. AR tracking is compiled automatically in your browser.</div>
+      <div class="section-sub">Upload image + video. AR tracking compiles automatically when scanning.</div>
       <div class="upload-card">
         <h3>① Target Name</h3>
         <div class="field" style="margin-bottom:0"><input id="target-name" type="text" placeholder="e.g. Exercise Card 1..." style="background:var(--bg);font-size:15px;"/></div>
@@ -292,7 +292,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
       </div>
       <div id="upload-error-msg" style="display:none;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4);border-radius:10px;padding:12px;font-size:12px;color:#ef4444;margin-bottom:12px;word-break:break-all;line-height:1.6;"></div>
       <button class="btn btn-primary" id="upload-btn" style="width:100%;padding:14px;font-size:15px;margin-top:4px;" onclick="uploadTarget()">
-        🚀 Compile &amp; Save to Library
+        🚀 Save to Library
       </button>
     </div>
     <!-- LIBRARY TAB -->
@@ -352,7 +352,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('AR Magic v20');
+console.log('AR Magic v21');
 AFRAME.registerComponent('ar-stabilizer',{schema:{alpha:{type:'number',default:0.2}},init:function(){this.sp=new THREE.Vector3();this.sq=new THREE.Quaternion();this.rdy=false;},tick:function(){const o=this.el.object3D;if(!o.visible){this.rdy=false;return;}if(!this.rdy){this.sp.copy(o.position);this.sq.copy(o.quaternion);this.rdy=true;return;}const a=this.data.alpha;this.sp.lerp(o.position,a);this.sq.slerp(o.quaternion,a);o.position.copy(this.sp);o.quaternion.copy(this.sq);}});
 
 // ── CONFIG ──
@@ -499,39 +499,40 @@ async function uploadTarget() {
   if (!imgFile) { toast('Select an image', 'error'); return; }
   if (!vidFile) { toast('Select a video', 'error'); return; }
   const btn = document.getElementById('upload-btn');
-  btn.disabled = true; btn.textContent = '⏳ Working...';
-  const errDiv = document.getElementById('upload-error-msg'); if(errDiv) errDiv.style.display='none';
+  btn.disabled = true; btn.textContent = '⏳ Uploading...';
+  const errDiv = document.getElementById('upload-error-msg');
+  if (errDiv) errDiv.style.display = 'none';
   try {
-    showUploadProgress(true, 'Analysing image...', 0);
-    const mindBuffer = await compileMindFile(imgFile, p => showUploadProgress(true, 'Compiling AR data...', p * 78));
-    showUploadProgress(true, 'Uploading image...', 80);
+    // Step 1: Upload image
+    showUploadProgress(true, 'Uploading image...', 20);
     const imgUrl = await uploadFile(imgFile, `images/${Date.now()}_${clean(imgFile.name)}`);
-    showUploadProgress(true, 'Uploading video...', 87);
+
+    // Step 2: Upload video
+    showUploadProgress(true, 'Uploading video...', 60);
     const vidUrl = await uploadFile(vidFile, `videos/${Date.now()}_${clean(vidFile.name)}`);
-    showUploadProgress(true, 'Uploading AR data...', 93);
-    const mindF  = new File([new Blob([mindBuffer],{type:'application/octet-stream'})], `${Date.now()}_target.mind`);
-    const mindUrl = await uploadFile(mindF, `minds/${mindF.name}`);
-    showUploadProgress(true, 'Saving...', 98);
-    await dbInsert({ name, image_url:imgUrl, video_url:vidUrl, mind_url:mindUrl });
-    showUploadProgress(true, '✓ Done!', 100);
-    setTimeout(() => showUploadProgress(false), 1200);
-    toast('✓ Saved to library! Tap Library tab to view.', 'success');
+
+    // Step 3: Save to database
+    // mind_url is set to image_url — buildARScene recompiles from images at scan time
+    showUploadProgress(true, 'Saving to library...', 90);
+    await dbInsert({ name, image_url: imgUrl, video_url: vidUrl, mind_url: imgUrl });
+
+    showUploadProgress(true, '✓ Saved!', 100);
+    setTimeout(() => showUploadProgress(false), 1500);
+    toast('✓ Saved! Tap Library to view.', 'success');
     document.getElementById('target-name').value = '';
     clearImage(); clearVideo();
+
   } catch(e) {
     console.error('Upload error:', e);
-    // Show persistent error box
-    const errDiv = document.getElementById('upload-error-msg');
     if (errDiv) {
-      errDiv.textContent = '❌ ' + e.message;
+      errDiv.textContent = '❌ Upload failed: ' + e.message;
       errDiv.style.display = 'block';
-      setTimeout(() => errDiv.style.display='none', 30000);
     }
-    toast('Upload error - see details above', 'error');
+    toast('Upload failed — see error above', 'error');
     showUploadProgress(false);
   } finally {
     btn.disabled = false;
-    btn.innerHTML = '🚀 Compile &amp; Save to Library';
+    btn.innerHTML = '🚀 Save to Library';
   }
 }
 
