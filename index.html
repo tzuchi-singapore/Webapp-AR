@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-<title>AR Magic v23</title>
+<title>AR Magic v24</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
@@ -352,7 +352,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('AR Magic v23');
+console.log('AR Magic v24');
 AFRAME.registerComponent('ar-stabilizer',{schema:{alpha:{type:'number',default:0.2}},init:function(){this.sp=new THREE.Vector3();this.sq=new THREE.Quaternion();this.rdy=false;},tick:function(){const o=this.el.object3D;if(!o.visible){this.rdy=false;return;}if(!this.rdy){this.sp.copy(o.position);this.sq.copy(o.quaternion);this.rdy=true;return;}const a=this.data.alpha;this.sp.lerp(o.position,a);this.sq.slerp(o.quaternion,a);o.position.copy(this.sp);o.quaternion.copy(this.sq);}});
 
 // ── CONFIG ──
@@ -503,23 +503,31 @@ async function uploadTarget() {
   const errDiv = document.getElementById('upload-error-msg');
   if (errDiv) errDiv.style.display = 'none';
   try {
-    // Upload image
-    showUploadProgress(true, 'Uploading image...', 10);
+    // Step 1: Upload image
+    showUploadProgress(true, 'Uploading image... (1/2)', 15);
+    await new Promise(r => setTimeout(r, 300));
     const imgUrl = await uploadFile(imgFile, `images/${Date.now()}_${clean(imgFile.name)}`);
+    showUploadProgress(true, 'Image uploaded ✓', 45);
+    await new Promise(r => setTimeout(r, 200));
 
-    // Upload video
-    showUploadProgress(true, 'Uploading video...', 55);
+    // Step 2: Upload video
+    showUploadProgress(true, 'Uploading video... (2/2)', 55);
+    await new Promise(r => setTimeout(r, 300));
     const vidUrl = await uploadFile(vidFile, `videos/${Date.now()}_${clean(vidFile.name)}`);
+    showUploadProgress(true, 'Video uploaded ✓', 85);
+    await new Promise(r => setTimeout(r, 200));
 
-    // Save to database (mind_url = '' — scanner compiles at scan time)
-    showUploadProgress(true, 'Saving to library...', 90);
+    // Step 3: Save to database
+    showUploadProgress(true, 'Saving to library...', 93);
     await dbInsert({ name, image_url: imgUrl, video_url: vidUrl, mind_url: '' });
 
-    showUploadProgress(true, '✓ Saved!', 100);
-    setTimeout(() => showUploadProgress(false), 1500);
-    toast('✓ Saved! Tap Library to view.', 'success');
+    showUploadProgress(true, '✓ All done!', 100);
+    setTimeout(() => showUploadProgress(false), 2000);
+    toast('✓ Saved to library!', 'success');
     document.getElementById('target-name').value = '';
     clearImage(); clearVideo();
+    // Auto-switch to Library so user can see it
+    setTimeout(() => switchTab('library'), 2500);
 
   } catch(e) {
     console.error('Upload error:', e);
@@ -688,8 +696,10 @@ async function requestCameraThenBuild() {
   document.getElementById('ar-load-title').textContent = 'Loading Targets';
   document.getElementById('ar-load-detail').textContent = 'Please wait...';
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' } });
+    document.getElementById('ar-load-detail').textContent = 'Requesting camera access...';
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode:'environment' }, audio: false });
     stream.getTracks().forEach(t => t.stop());
+    document.getElementById('ar-load-detail').textContent = 'Camera ready. Loading targets...';
     startProgressBar();
     await new Promise(r => setTimeout(r, 1500));
     const targets = await dbFetch();
@@ -746,6 +756,8 @@ async function buildARScene(targets) {
 }
 
 async function buildSingleTarget(target) {
+  const wrap = document.getElementById('ar-scene-wrap');
+  wrap.innerHTML = '';
   document.getElementById('ar-load-title').textContent = 'Loading Tracker';
   document.getElementById('ar-load-detail').textContent = 'Preparing...';
 
