@@ -255,7 +255,12 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
     <!-- UPLOAD TAB -->
     <div class="tab-panel active" id="panel-upload">
       <div class="section-title">✦ Add New AR Target</div>
-      <div class="section-sub">Upload image + video. AR tracking is compiled automatically in your browser.</div>
+      <div class="section-sub">Upload image + video. AR tracking is compiled automatically.</div>
+      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:10px;padding:12px 14px;font-size:12px;color:rgba(255,200,50,.9);margin-bottom:16px;line-height:1.7;">
+        💡 <b>If compile crashes:</b> Use the <b>Manual .mind</b> option below — compile your image at
+        <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile" target="_blank" style="color:#22d3ee;">MindAR Compiler ↗</a>
+        on a computer, then upload the .mind file here.
+      </div>
       <div class="upload-card">
         <h3>① Target Name</h3>
         <div class="field" style="margin-bottom:0"><input id="target-name" type="text" placeholder="e.g. Exercise Card 1..." style="background:var(--bg);font-size:15px;"/></div>
@@ -284,6 +289,20 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
           <div class="preview-thumb vid-icon">▶</div>
           <div class="preview-info"><div class="preview-name" id="vid-fname"></div><div class="preview-size" id="vid-fsize"></div></div>
           <button class="preview-remove" onclick="clearVideo()">✕</button>
+        </div>
+      </div>
+      <div class="upload-card" id="mind-upload-card">
+        <h3>④ .mind File <span style="color:var(--green);font-size:10px;font-weight:700;padding:2px 6px;background:rgba(16,185,129,.15);border-radius:10px;margin-left:4px;">OPTIONAL</span></h3>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Skip browser compilation — upload a pre-compiled .mind file instead. Get it free at <a href="https://hiukim.github.io/mind-ar-js-doc/tools/compile" target="_blank" style="color:var(--teal);">MindAR compiler</a>.</div>
+        <div class="drop-zone" id="mind-drop" onclick="document.getElementById('mind-input').click()">
+          <input type="file" id="mind-input" accept=".mind" style="display:none" onchange="handleMindSelect(this)"/>
+          <div class="drop-icon">🎯</div>
+          <div class="drop-label"><strong>Tap to choose .mind file</strong><br>Pre-compiled tracking data</div>
+        </div>
+        <div class="preview-box hidden" id="mind-preview">
+          <div class="preview-thumb vid-icon">🎯</div>
+          <div class="preview-info"><div class="preview-name" id="mind-fname"></div><div class="preview-size" id="mind-fsize"></div></div>
+          <button class="preview-remove" onclick="clearMind()">✕</button>
         </div>
       </div>
       <div class="compile-progress" id="compile-progress">
@@ -356,7 +375,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('=== AR Magic v18g ===');
+console.log('=== AR Magic v18i ===');
 
 // ── AR STABILISER (double-smoothing: lerp pos + slerp rot) ──
 AFRAME.registerComponent('ar-stabilizer', {
@@ -381,7 +400,7 @@ const KEY_KEY = 'arlive_key';
 const SESSION = 'arlive_session';
 
 let SB_URL = '', SB_KEY = '';
-let imgFile = null, vidFile = null;
+let imgFile = null, vidFile = null, mindFile = null;
 let libraryData = [];
 let _arMuted = true;
 let _activeVideos = new Set();
@@ -508,6 +527,15 @@ function handleVideoSelect(input) {
 }
 function clearImage() { imgFile=null; document.getElementById('img-input').value=''; document.getElementById('img-preview').classList.add('hidden'); document.getElementById('img-drop').style.display=''; }
 function clearVideo() { vidFile=null; document.getElementById('vid-input').value=''; document.getElementById('vid-preview').classList.add('hidden'); document.getElementById('vid-drop').style.display=''; }
+function handleMindSelect(input) {
+  const f = input.files[0]; if (!f) return;
+  mindFile = f;
+  document.getElementById('mind-fname').textContent = f.name;
+  document.getElementById('mind-fsize').textContent = fmtSize(f.size);
+  document.getElementById('mind-preview').classList.remove('hidden');
+  document.getElementById('mind-drop').style.display = 'none';
+}
+function clearMind() { mindFile=null; document.getElementById('mind-input').value=''; document.getElementById('mind-preview').classList.add('hidden'); document.getElementById('mind-drop').style.display=''; }
 function fmtSize(b) { if(b<1024) return b+' B'; if(b<1048576) return (b/1024).toFixed(1)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
 
 // ── UPLOAD COMPILE ──
@@ -531,9 +559,19 @@ async function uploadTarget() {
   const errBox = document.getElementById('upload-error-box');
   if (errBox) errBox.style.display = 'none';
   try {
-    showUploadProgress(true, 'Analysing image...', 0);
-    const mindBuffer = await compileMindFile(imgFile, p => showUploadProgress(true, 'Compiling AR data...', p * 78));
-    showUploadProgress(true, 'Uploading image...', 80);
+    let mindBuffer;
+    if (mindFile) {
+      // Use pre-compiled .mind file — skip browser compilation
+      showUploadProgress(true, 'Reading .mind file...', 10);
+      mindBuffer = await mindFile.arrayBuffer();
+      showUploadProgress(true, 'Uploading image...', 30);
+    } else {
+      // Compile in browser
+      showUploadProgress(true, 'Analysing image...', 0);
+      mindBuffer = await compileMindFile(imgFile, p => showUploadProgress(true, 'Compiling... ' + Math.round(p*100) + '%', p * 78));
+      showUploadProgress(true, 'Uploading image...', 80);
+    }
+    showUploadProgress(true, 'Uploading image...', mindFile ? 35 : 80);
     const imgUrl = await uploadFile(imgFile, `images/${Date.now()}_${clean(imgFile.name)}`);
     showUploadProgress(true, 'Uploading video...', 87);
     const vidUrl = await uploadFile(vidFile, `videos/${Date.now()}_${clean(vidFile.name)}`);
@@ -546,7 +584,7 @@ async function uploadTarget() {
     setTimeout(() => showUploadProgress(false), 1200);
     toast('✓ Saved to library!', 'success');
     document.getElementById('target-name').value = '';
-    clearImage(); clearVideo();
+    clearImage(); clearVideo(); clearMind();
     switchTab('library');
   } catch(e) {
     showUploadProgress(false);
@@ -587,7 +625,7 @@ function clean(name) { return name.replace(/[^a-zA-Z0-9._-]/g, '_'); }
 // ── SUPABASE ──
 async function uploadFile(file, path) {
   const res = await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${path}`, {
-    method:'POST', headers:{'Authorization':`Bearer ${SB_KEY}`,'x-upsert':'true','Content-Type':file.type||'application/octet-stream'}, body:file
+    method:'POST', headers:{'Authorization':`Bearer ${SB_KEY}`,'apikey':SB_KEY,'x-upsert':'true','Content-Type':file.type||'application/octet-stream'}, body:file
   });
   if (!res.ok) { const e=await res.text(); throw new Error(`Upload failed (${res.status}): ${e}`); }
   return `${SB_URL}/storage/v1/object/public/${BUCKET}/${path}`;
