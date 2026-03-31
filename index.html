@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-<title>AR Magic v21</title>
+<title>AR Magic v21b</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
@@ -352,7 +352,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('AR Magic v21');
+console.log('AR Magic v21b');
 AFRAME.registerComponent('ar-stabilizer',{schema:{alpha:{type:'number',default:0.2}},init:function(){this.sp=new THREE.Vector3();this.sq=new THREE.Quaternion();this.rdy=false;},tick:function(){const o=this.el.object3D;if(!o.visible){this.rdy=false;return;}if(!this.rdy){this.sp.copy(o.position);this.sq.copy(o.quaternion);this.rdy=true;return;}const a=this.data.alpha;this.sp.lerp(o.position,a);this.sq.slerp(o.quaternion,a);o.position.copy(this.sp);o.quaternion.copy(this.sq);}});
 
 // ── CONFIG ──
@@ -499,22 +499,32 @@ async function uploadTarget() {
   if (!imgFile) { toast('Select an image', 'error'); return; }
   if (!vidFile) { toast('Select a video', 'error'); return; }
   const btn = document.getElementById('upload-btn');
-  btn.disabled = true; btn.textContent = '⏳ Uploading...';
+  btn.disabled = true; btn.textContent = '⏳ Working...';
   const errDiv = document.getElementById('upload-error-msg');
   if (errDiv) errDiv.style.display = 'none';
   try {
-    // Step 1: Upload image
-    showUploadProgress(true, 'Uploading image...', 20);
+    // Step 1: Compile .mind for THIS image only (1 image = fast, ~5s)
+    showUploadProgress(true, 'Compiling AR tracking...', 5);
+    const mindBuffer = await compileSingleMind(imgFile, p => {
+      showUploadProgress(true, `Compiling... ${Math.round(p*100)}%`, 5 + p*55);
+    });
+
+    // Step 2: Upload image
+    showUploadProgress(true, 'Uploading image...', 65);
     const imgUrl = await uploadFile(imgFile, `images/${Date.now()}_${clean(imgFile.name)}`);
 
-    // Step 2: Upload video
-    showUploadProgress(true, 'Uploading video...', 60);
+    // Step 3: Upload video
+    showUploadProgress(true, 'Uploading video...', 78);
     const vidUrl = await uploadFile(vidFile, `videos/${Date.now()}_${clean(vidFile.name)}`);
 
-    // Step 3: Save to database
-    // mind_url is set to image_url — buildARScene recompiles from images at scan time
-    showUploadProgress(true, 'Saving to library...', 90);
-    await dbInsert({ name, image_url: imgUrl, video_url: vidUrl, mind_url: imgUrl });
+    // Step 4: Upload .mind file
+    showUploadProgress(true, 'Uploading AR data...', 88);
+    const mindFile2 = new File([new Blob([mindBuffer],{type:'application/octet-stream'})], `${Date.now()}.mind`);
+    const mindUrl = await uploadFile(mindFile2, `minds/${mindFile2.name}`);
+
+    // Step 5: Save record
+    showUploadProgress(true, 'Saving to library...', 96);
+    await dbInsert({ name, image_url: imgUrl, video_url: vidUrl, mind_url: mindUrl });
 
     showUploadProgress(true, '✓ Saved!', 100);
     setTimeout(() => showUploadProgress(false), 1500);
@@ -525,15 +535,34 @@ async function uploadTarget() {
   } catch(e) {
     console.error('Upload error:', e);
     if (errDiv) {
-      errDiv.textContent = '❌ Upload failed: ' + e.message;
+      errDiv.textContent = '❌ ' + e.message;
       errDiv.style.display = 'block';
     }
-    toast('Upload failed — see error above', 'error');
+    toast('Upload failed', 'error');
     showUploadProgress(false);
   } finally {
     btn.disabled = false;
     btn.innerHTML = '🚀 Save to Library';
   }
+}
+
+// Compile a SINGLE image to .mind — much lighter than multi-image compile
+async function compileSingleMind(imageFile, onProgress) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(imageFile);
+    img.onload = async () => {
+      URL.revokeObjectURL(url);
+      try {
+        const compiler = new window.MINDAR.IMAGE.Compiler();
+        await compiler.compileImageTargets([img], p => onProgress(p));
+        resolve(await compiler.exportData());
+      } catch(e) { reject(new Error('Compile failed: ' + e.message)); }
+    };
+    img.onerror = () => reject(new Error('Cannot load image'));
+    img.crossOrigin = 'anonymous';
+    img.src = url;
+  });
 }
 
 async function compileMindFile(imageFile, onProgress) {
@@ -704,25 +733,64 @@ async function requestCameraThenBuild() {
   }
 }
 
+
+async function recompileFromImages(targets) {
+  const images = [];
+  for (let i = 0; i < targets.length; i++) {
+    document.getElementById('ar-load-title').textContent = 'Building Tracker';
+    document.getElementById('ar-load-detail').textContent = `Loading image ${i+1}/${targets.length}...`;
+    const img = await loadImg(targets[i].image_url);
+    images.push(img);
+  }
+  document.getElementById('ar-load-detail').textContent = 'Compiling... 0%';
+  const compiler = new window.MINDAR.IMAGE.Compiler();
+  await compiler.compileImageTargets(images, p => {
+    document.getElementById('ar-load-detail').textContent = `Compiling... ${Math.round(p*100)}%`;
+  });
+  const buf = await compiler.exportData();
+  return URL.createObjectURL(new Blob([buf], {type:'application/octet-stream'}));
+}
+
 async function buildARScene(targets) {
   const wrap = document.getElementById('ar-scene-wrap');
   wrap.innerHTML = '';
 
-  const images = [], aspects = [];
-  for (let i = 0; i < targets.length; i++) {
-    document.getElementById('ar-load-detail').textContent = `Loading image ${i+1}/${targets.length}...`;
-    const img = await loadImg(targets[i].image_url);
-    images.push(img);
-    aspects.push(img.naturalHeight / img.naturalWidth);
+  // Separate targets: those with real .mind files vs those needing compile
+  const hasMind = targets.filter(t => t.mind_url && t.mind_url.endsWith('.mind'));
+  const noMind  = targets.filter(t => !t.mind_url || !t.mind_url.endsWith('.mind'));
+
+  let mindUrl;
+
+  if (hasMind.length === targets.length) {
+    // ALL targets have pre-compiled .mind files — fetch and merge (no compile needed!)
+    document.getElementById('ar-load-title').textContent = 'Loading Tracker';
+    const buffers = [];
+    for (let i = 0; i < hasMind.length; i++) {
+      document.getElementById('ar-load-detail').textContent = `Loading tracker ${i+1}/${hasMind.length}...`;
+      const res = await fetch(hasMind[i].mind_url);
+      if (!res.ok) throw new Error('Failed to fetch .mind file');
+      buffers.push(await res.arrayBuffer());
+    }
+    // If only 1 target, use directly. If multiple, we still need to recompile from images
+    if (buffers.length === 1) {
+      mindUrl = URL.createObjectURL(new Blob([buffers[0]], {type:'application/octet-stream'}));
+    } else {
+      // Multiple targets: recompile (necessary for multi-target tracking)
+      mindUrl = await recompileFromImages(targets);
+    }
+  } else {
+    // Some/all targets need compile from images
+    mindUrl = await recompileFromImages(targets);
   }
 
-  document.getElementById('ar-load-title').textContent = 'Building Tracker';
-  const compiler = new window.MINDAR.IMAGE.Compiler();
-  await compiler.compileImageTargets(images, p => {
-    document.getElementById('ar-load-detail').textContent = `Compiling... ${Math.round(p * 100)}%`;
-  });
-  const mindBuffer = await compiler.exportData();
-  const mindUrl = URL.createObjectURL(new Blob([mindBuffer], {type:'application/octet-stream'}));
+  // Load aspect ratios for video sizing
+  const aspects = [];
+  for (let i = 0; i < targets.length; i++) {
+    try {
+      const img = await loadImg(targets[i].image_url);
+      aspects.push(img.naturalHeight / img.naturalWidth);
+    } catch(e) { aspects.push(0.5625); }
+  }
 
   document.getElementById('ar-load-title').textContent = 'Starting Camera';
   document.getElementById('ar-load-detail').textContent = 'Almost ready...';
