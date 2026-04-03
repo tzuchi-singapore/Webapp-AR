@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no"/>
-<title>AR Magic Library v26</title>
+<title>AR Magic Library v27</title>
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
 <style>
@@ -308,17 +308,62 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 <!-- EDIT MODAL -->
 
 <div id="edit-modal" class="hidden">
-  <div class="edit-card">
-    <h3>✏️ Edit Target Name</h3>
-    <div class="field">
-      <label>Name</label>
-      <input id="edit-name-input" type="text" placeholder="Enter new name..."/>
-    </div>
-    <input type="hidden" id="edit-record-id"/>
-    <div style="display:flex;gap:10px;margin-top:6px;">
-      <button class="btn btn-ghost" style="flex:1" onclick="closeEditModal()">Cancel</button>
-      <button class="btn btn-primary" style="flex:2" onclick="saveEdit()">✓ Save</button>
-    </div>
+  <div class="edit-card" style="max-height:88vh;overflow-y:auto;">
+    <h3 style="margin-bottom:16px;">✏️ Edit Target</h3>
+
+```
+<!-- Name -->
+<div class="field">
+  <label>Name</label>
+  <input id="edit-name-input" type="text" placeholder="Enter new name..."/>
+</div>
+
+<!-- Replace Image -->
+<div class="field" style="margin-bottom:8px;">
+  <label>Replace Image <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">(optional — leave blank to keep current)</span></label>
+  <div id="edit-img-drop" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--surface2);" onclick="document.getElementById('edit-img-input').click()">
+    <input type="file" id="edit-img-input" accept="image/*" style="display:none" onchange="handleEditImage(this)"/>
+    <div id="edit-img-label" style="font-size:13px;color:var(--muted);">🖼️ Tap to choose new image</div>
+  </div>
+  <div id="edit-img-preview" class="hidden" style="display:none;align-items:center;gap:10px;margin-top:8px;background:var(--bg);border-radius:8px;padding:8px;border:1px solid var(--border);">
+    <img id="edit-img-thumb" src="" style="width:48px;height:48px;border-radius:6px;object-fit:cover;"/>
+    <div style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="edit-img-fname"></div>
+    <button onclick="clearEditImage()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>
+  </div>
+</div>
+
+<!-- Replace Video -->
+<div class="field">
+  <label>Replace Video <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0;">(optional — leave blank to keep current)</span></label>
+  <div id="edit-vid-drop" style="border:2px dashed var(--border);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--surface2);" onclick="document.getElementById('edit-vid-input').click()">
+    <input type="file" id="edit-vid-input" accept="video/*" style="display:none" onchange="handleEditVideo(this)"/>
+    <div id="edit-vid-label" style="font-size:13px;color:var(--muted);">🎬 Tap to choose new video</div>
+  </div>
+  <div id="edit-vid-preview" class="hidden" style="display:none;align-items:center;gap:10px;margin-top:8px;background:var(--bg);border-radius:8px;padding:8px;border:1px solid var(--border);">
+    <div style="width:48px;height:48px;border-radius:6px;background:rgba(108,99,255,.15);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">▶</div>
+    <div style="flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" id="edit-vid-fname"></div>
+    <button onclick="clearEditVideo()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">✕</button>
+  </div>
+</div>
+
+<!-- Progress -->
+<div id="edit-progress" style="display:none;margin-bottom:12px;">
+  <div style="font-size:12px;color:var(--muted);margin-bottom:6px;" id="edit-progress-label">Uploading...</div>
+  <div style="background:var(--surface2);border-radius:6px;height:6px;overflow:hidden;">
+    <div id="edit-progress-bar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--teal));border-radius:6px;transition:width .3s;"></div>
+  </div>
+</div>
+
+<input type="hidden" id="edit-record-id"/>
+<input type="hidden" id="edit-old-img-url"/>
+<input type="hidden" id="edit-old-vid-url"/>
+
+<div style="display:flex;gap:10px;margin-top:4px;">
+  <button class="btn btn-ghost" style="flex:1" onclick="closeEditModal()">Cancel</button>
+  <button class="btn btn-primary" style="flex:2" id="edit-save-btn" onclick="saveEdit()">✓ Save Changes</button>
+</div>
+```
+
   </div>
 </div>
 
@@ -356,7 +401,7 @@ transition:all .25s;position:relative;box-shadow:0 0 40px rgba(34,211,238,.2);
 
 <script>
 'use strict';
-console.log('AR Magic v26');;
+console.log('AR Magic v27');;
 
 // ── CONFIG ──
 const BUCKET = 'ar-assets';
@@ -603,7 +648,7 @@ function renderLibrary(items) {
         </div>
       </div>
       <div class="lib-actions">
-        <button class="lib-act-btn lib-edit" onclick="openEditModal(${item.id},'${esc(item.name)}')">✏️ Edit</button>
+        <button class="lib-act-btn lib-edit" onclick="openEditModal(${item.id},'${esc(item.name)}','${item.image_url||''}','${item.video_url||''}')">>✏️ Edit</button>
         <button class="lib-act-btn lib-del" onclick="confirmDelete(${item.id},'${item.mind_url||''}','${item.image_url||''}','${item.video_url||''}')">🗑 Delete</button>
       </div>
     </div>`).join('');
@@ -617,19 +662,121 @@ async function confirmDelete(id, mind, img, vid) {
 }
 
 // ── EDIT MODAL ──
-function openEditModal(id, name) {
-  document.getElementById('edit-record-id').value = id;
-  document.getElementById('edit-name-input').value = name;
+let _editImgFile = null, _editVidFile = null;
+
+function openEditModal(id, name, imgUrl, vidUrl) {
+  document.getElementById('edit-record-id').value  = id;
+  document.getElementById('edit-name-input').value  = name;
+  document.getElementById('edit-old-img-url').value = imgUrl || '';
+  document.getElementById('edit-old-vid-url').value = vidUrl || '';
+  // Reset file pickers
+  _editImgFile = null; _editVidFile = null;
+  document.getElementById('edit-img-input').value = '';
+  document.getElementById('edit-vid-input').value = '';
+  document.getElementById('edit-img-preview').style.display = 'none';
+  document.getElementById('edit-vid-preview').style.display = 'none';
+  document.getElementById('edit-img-drop').style.display = 'block';
+  document.getElementById('edit-vid-drop').style.display = 'block';
+  document.getElementById('edit-progress').style.display = 'none';
+  document.getElementById('edit-progress-bar').style.width = '0%';
+  document.getElementById('edit-save-btn').disabled = false;
   document.getElementById('edit-modal').classList.remove('hidden');
   setTimeout(() => document.getElementById('edit-name-input').focus(), 100);
 }
-function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.add('hidden');
+  _editImgFile = null; _editVidFile = null;
+}
+
+function handleEditImage(input) {
+  const f = input.files[0]; if (!f) return;
+  _editImgFile = f;
+  document.getElementById('edit-img-thumb').src = URL.createObjectURL(f);
+  document.getElementById('edit-img-fname').textContent = f.name;
+  document.getElementById('edit-img-preview').style.display = 'flex';
+  document.getElementById('edit-img-drop').style.display = 'none';
+}
+function clearEditImage() {
+  _editImgFile = null;
+  document.getElementById('edit-img-input').value = '';
+  document.getElementById('edit-img-preview').style.display = 'none';
+  document.getElementById('edit-img-drop').style.display = 'block';
+}
+function handleEditVideo(input) {
+  const f = input.files[0]; if (!f) return;
+  _editVidFile = f;
+  document.getElementById('edit-vid-fname').textContent = f.name;
+  document.getElementById('edit-vid-preview').style.display = 'flex';
+  document.getElementById('edit-vid-drop').style.display = 'none';
+}
+function clearEditVideo() {
+  _editVidFile = null;
+  document.getElementById('edit-vid-input').value = '';
+  document.getElementById('edit-vid-preview').style.display = 'none';
+  document.getElementById('edit-vid-drop').style.display = 'block';
+}
+function setEditProgress(pct, label) {
+  document.getElementById('edit-progress').style.display = 'block';
+  document.getElementById('edit-progress-label').textContent = label;
+  document.getElementById('edit-progress-bar').style.width = pct + '%';
+}
 async function saveEdit() {
-  const id   = document.getElementById('edit-record-id').value;
-  const name = document.getElementById('edit-name-input').value.trim();
+  const id      = document.getElementById('edit-record-id').value;
+  const name    = document.getElementById('edit-name-input').value.trim();
+  const oldImg  = document.getElementById('edit-old-img-url').value;
+  const oldVid  = document.getElementById('edit-old-vid-url').value;
   if (!name) { toast('Name cannot be empty','error'); return; }
-  try { await dbUpdate(id,{name}); closeEditModal(); toast('Updated ✓','success'); loadLibrary(); }
-  catch(e) { toast('Update failed: '+e.message,'error'); }
+
+  const btn = document.getElementById('edit-save-btn');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+
+  try {
+    const updates = { name };
+
+    // Upload new image if selected
+    if (_editImgFile) {
+      setEditProgress(20, 'Uploading new image...');
+      updates.image_url = await uploadFile(_editImgFile, `images/${Date.now()}_${clean(_editImgFile.name)}`);
+      // Delete old image from storage
+      if (oldImg) deleteStorageFile(oldImg);
+    }
+
+    // Upload new video if selected
+    if (_editVidFile) {
+      setEditProgress(_editImgFile ? 60 : 40, 'Uploading new video...');
+      updates.video_url = await uploadFile(_editVidFile, `videos/${Date.now()}_${clean(_editVidFile.name)}`);
+      // Delete old video from storage
+      if (oldVid) deleteStorageFile(oldVid);
+    }
+
+    setEditProgress(90, 'Saving...');
+    await dbUpdate(id, updates);
+
+    setEditProgress(100, '✓ Done!');
+    setTimeout(() => {
+      closeEditModal();
+      toast('✓ Updated successfully!', 'success');
+      loadLibrary();
+    }, 800);
+
+  } catch(e) {
+    toast('Update failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '✓ Save Changes';
+    document.getElementById('edit-progress').style.display = 'none';
+  }
+}
+
+// Best-effort delete old storage file after replacement
+async function deleteStorageFile(url) {
+  try {
+    const path = url.split(`/public/${BUCKET}/`)[1];
+    if (!path) return;
+    await fetch(`${SB_URL}/storage/v1/object/${BUCKET}/${path}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${SB_KEY}` }
+    });
+  } catch(e) {}
 }
 
 // ── AR SCANNER ──
